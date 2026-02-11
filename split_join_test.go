@@ -9,6 +9,17 @@ import (
 	"testing"
 )
 
+func TestResizeUltraHDRFile(t *testing.T) {
+	if err := ResizeUltraHDRFile("testdata/uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
+		&ResizeOptions{
+			BaseQuality:    85,
+			GainmapQuality: 65,
+		},
+		"testdata/uhdr_thumb_primary.jpg", "testdata/uhdr_thumb_gainmap.jpg"); err != nil {
+		t.Fatalf("resize uhdr: %v", err)
+	}
+}
+
 func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	// Use a known valid UltraHDR JPEG.
 	uhdrPath := filepath.FromSlash("testdata/uhdr.jpg")
@@ -118,7 +129,9 @@ func TestSplitLegacyACRXMP(t *testing.T) {
 			t.Fatalf("expected uhdr2 to be detected as UltraHDR")
 		}
 	}
-	primary, gainmap, meta, err := Split(data)
+
+	primary, gainmap, meta, segs, err := SplitWithSegments(data)
+
 	if err != nil {
 		t.Fatalf("split uhdr2: %v", err)
 	}
@@ -133,6 +146,23 @@ func TestSplitLegacyACRXMP(t *testing.T) {
 	}
 	if meta.HDRCapacityMax <= 1.0 {
 		t.Fatalf("split uhdr2: invalid hdr capacity max")
+	}
+	// Repack without re-encoding to validate container assembly only.
+	repacked, err := JoinWithSegments(primary, gainmap, segs)
+	if err != nil {
+		t.Fatalf("repack join: %v", err)
+	}
+	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr2_repacked.jpg"), repacked, 0o644); err != nil {
+		t.Fatalf("write uhdr2_repacked.jpg: %v", err)
+	}
+
+	if err := ResizeUltraHDRFile("testdata/uhdr2.jpg", "testdata/uhdr2_thumb.jpg", 2400, 1600,
+		&ResizeOptions{
+			BaseQuality:    85,
+			GainmapQuality: 75,
+		},
+		"testdata/uhdr2_thumb_primary.jpg", "testdata/uhdr2_thumb_gainmap.jpg"); err != nil {
+		t.Fatalf("resize uhdr2: %v", err)
 	}
 }
 
