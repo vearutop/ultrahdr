@@ -286,24 +286,6 @@ func extractExifAndIcc(jpegData []byte) ([]byte, [][]byte, error) {
 	return exif, out, nil
 }
 
-// insertExifIcc builds a new JPEG by inserting EXIF and ICC segments after SOI.
-func insertExifIcc(jpegData []byte, exif []byte, icc [][]byte) ([]byte, error) {
-	if len(jpegData) < 2 || jpegData[0] != markerStart || jpegData[1] != markerSOI {
-		return nil, errors.New("invalid jpeg")
-	}
-	var out bytes.Buffer
-	out.WriteByte(markerStart)
-	out.WriteByte(markerSOI)
-	if len(exif) > 0 {
-		writeAppSegment(&out, markerAPP1, exif)
-	}
-	for _, seg := range icc {
-		writeAppSegment(&out, markerAPP2, seg)
-	}
-	out.Write(jpegData[2:])
-	return out.Bytes(), nil
-}
-
 func writeAppSegment(out *bytes.Buffer, marker byte, payload []byte) {
 	out.WriteByte(markerStart)
 	out.WriteByte(marker)
@@ -311,65 +293,6 @@ func writeAppSegment(out *bytes.Buffer, marker byte, payload []byte) {
 	out.WriteByte(byte(length >> 8))
 	out.WriteByte(byte(length))
 	out.Write(payload)
-}
-
-// extractAppSegmentsAll returns APP0-APP15 and COM segments in order.
-func extractAppSegmentsAll(jpegData []byte) ([]appSegment, error) {
-	if len(jpegData) < 4 || jpegData[0] != markerStart || jpegData[1] != markerSOI {
-		return nil, errors.New("invalid JPEG")
-	}
-	var segs []appSegment
-	pos := 2
-	for pos+3 < len(jpegData) {
-		if jpegData[pos] != markerStart {
-			pos++
-			continue
-		}
-		for pos < len(jpegData) && jpegData[pos] == markerStart {
-			pos++
-		}
-		if pos >= len(jpegData) {
-			break
-		}
-		marker := jpegData[pos]
-		pos++
-		if marker == markerSOS || marker == markerEOI {
-			break
-		}
-		if marker >= 0xD0 && marker <= 0xD7 {
-			continue
-		}
-		if pos+1 >= len(jpegData) {
-			return nil, errors.New("truncated marker")
-		}
-		segLen := int(binary.BigEndian.Uint16(jpegData[pos:]))
-		if segLen < 2 || pos+segLen > len(jpegData) {
-			return nil, errors.New("invalid segment length")
-		}
-		segStart := pos + 2
-		segEnd := pos + segLen
-		if marker == 0xFE || (marker >= markerAPP0 && marker <= 0xEF) {
-			payload := append([]byte(nil), jpegData[segStart:segEnd]...)
-			segs = append(segs, appSegment{marker: marker, payload: payload})
-		}
-		pos = segEnd
-	}
-	return segs, nil
-}
-
-// filterPreserveAppSegments removes XMP/ISO metadata segments that are handled at container level.
-func filterPreserveAppSegments(segs []appSegment) []appSegment {
-	out := make([]appSegment, 0, len(segs))
-	for _, s := range segs {
-		if s.marker == markerAPP1 && bytes.HasPrefix(s.payload, append([]byte(xmpNamespace), 0)) {
-			continue
-		}
-		if s.marker == markerAPP2 && bytes.HasPrefix(s.payload, append([]byte(isoNamespace), 0)) {
-			continue
-		}
-		out = append(out, s)
-	}
-	return out
 }
 
 // insertAppSegments inserts APP segments after SOI.

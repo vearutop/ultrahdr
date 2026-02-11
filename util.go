@@ -22,13 +22,6 @@ func srgbInvOetf(v float32) float32 {
 	return float32(math.Pow(float64((v+0.055)/1.055), 2.4))
 }
 
-func srgbOetf(v float32) float32 {
-	if v <= 0.0031308 {
-		return v * 12.92
-	}
-	return float32(1.055*math.Pow(float64(v), 1.0/2.4) - 0.055)
-}
-
 func roundf(v float32) float32 {
 	return float32(math.Round(float64(v)))
 }
