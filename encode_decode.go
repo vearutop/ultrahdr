@@ -228,7 +228,7 @@ func sampleHDR(hdr *HDRImage, x, y int) rgb {
 func applyGainMap(base image.Image, gainmap image.Image, meta *GainMapMetadata, opts *DecodeOptions) *HDRImage {
 	b := base.Bounds()
 	w, h := b.Dx(), b.Dy()
-	out := &HDRImage{Width: w, Height: h, Stride: w * 3, Pix: make([]float32, w*h*3), Gamut: GamutUnspecified, Transfer: TransferLinear}
+	out := &HDRImage{Width: w, Height: h, Stride: w * 3, Pix: make([]float32, w*h*3)}
 
 	gmBounds := gainmap.Bounds()
 	gmW, gmH := gmBounds.Dx(), gmBounds.Dy()

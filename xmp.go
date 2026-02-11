@@ -277,7 +277,7 @@ func generateXmpPrimary(secondaryLength int, meta *GainMapMetadata) []byte {
 	b.WriteString("<Container:Directory><rdf:Seq>")
 	b.WriteString("<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Semantic=\"Primary\" Item:Mime=\"image/jpeg\"/></rdf:li>")
 	b.WriteString("<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Semantic=\"GainMap\" Item:Mime=\"image/jpeg\" Item:Length=\"")
-	b.WriteString(fmt.Sprintf("%d", secondaryLength))
+	b.WriteString(strconv.Itoa(secondaryLength))
 	b.WriteString("\"/></rdf:li>")
 	b.WriteString("</rdf:Seq></Container:Directory>")
 	b.WriteString("</rdf:Description></rdf:RDF></x:xmpmeta>")

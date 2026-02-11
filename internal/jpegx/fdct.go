@@ -61,18 +61,18 @@ assumed by the product vendor.
 
 // Trigonometric constants in 13-bit fixed point format.
 const (
-	fix_0_298631336 = 2446
-	fix_0_390180644 = 3196
-	fix_0_541196100 = 4433
-	fix_0_765366865 = 6270
-	fix_0_899976223 = 7373
-	fix_1_175875602 = 9633
-	fix_1_501321110 = 12299
-	fix_1_847759065 = 15137
-	fix_1_961570560 = 16069
-	fix_2_053119869 = 16819
-	fix_2_562915447 = 20995
-	fix_3_072711026 = 25172
+	fix0x298631336 = 2446
+	fix0x390180644 = 3196
+	fix0x541196100 = 4433
+	fix0x765366865 = 6270
+	fix0x899976223 = 7373
+	fix1x175875602 = 9633
+	fix1x501321110 = 12299
+	fix1x847759065 = 15137
+	fix1x961570560 = 16069
+	fix2x053119869 = 16819
+	fix2x562915447 = 20995
+	fix3x072711026 = 25172
 )
 
 const (
@@ -114,25 +114,25 @@ func fdct(b *block) {
 
 		s[0] = (tmp10 + tmp11 - 8*centerJSample) << pass1Bits
 		s[4] = (tmp10 - tmp11) << pass1Bits
-		z1 := (tmp12 + tmp13) * fix_0_541196100
+		z1 := (tmp12 + tmp13) * fix0x541196100
 		z1 += 1 << (constBits - pass1Bits - 1)
-		s[2] = (z1 + tmp12*fix_0_765366865) >> (constBits - pass1Bits)
-		s[6] = (z1 - tmp13*fix_1_847759065) >> (constBits - pass1Bits)
+		s[2] = (z1 + tmp12*fix0x765366865) >> (constBits - pass1Bits)
+		s[6] = (z1 - tmp13*fix1x847759065) >> (constBits - pass1Bits)
 
 		tmp10 = tmp0 + tmp3
 		tmp11 = tmp1 + tmp2
 		tmp12 = tmp0 + tmp2
 		tmp13 = tmp1 + tmp3
-		z1 = (tmp12 + tmp13) * fix_1_175875602
+		z1 = (tmp12 + tmp13) * fix1x175875602
 		z1 += 1 << (constBits - pass1Bits - 1)
-		tmp0 *= fix_1_501321110
-		tmp1 *= fix_3_072711026
-		tmp2 *= fix_2_053119869
-		tmp3 *= fix_0_298631336
-		tmp10 *= -fix_0_899976223
-		tmp11 *= -fix_2_562915447
-		tmp12 *= -fix_0_390180644
-		tmp13 *= -fix_1_961570560
+		tmp0 *= fix1x501321110
+		tmp1 *= fix3x072711026
+		tmp2 *= fix2x053119869
+		tmp3 *= fix0x298631336
+		tmp10 *= -fix0x899976223
+		tmp11 *= -fix2x562915447
+		tmp12 *= -fix0x390180644
+		tmp13 *= -fix1x961570560
 
 		tmp12 += z1
 		tmp13 += z1
@@ -162,25 +162,25 @@ func fdct(b *block) {
 		b[0*8+x] = (tmp10 + tmp11) >> pass1Bits
 		b[4*8+x] = (tmp10 - tmp11) >> pass1Bits
 
-		z1 := (tmp12 + tmp13) * fix_0_541196100
+		z1 := (tmp12 + tmp13) * fix0x541196100
 		z1 += 1 << (constBits + pass1Bits - 1)
-		b[2*8+x] = (z1 + tmp12*fix_0_765366865) >> (constBits + pass1Bits)
-		b[6*8+x] = (z1 - tmp13*fix_1_847759065) >> (constBits + pass1Bits)
+		b[2*8+x] = (z1 + tmp12*fix0x765366865) >> (constBits + pass1Bits)
+		b[6*8+x] = (z1 - tmp13*fix1x847759065) >> (constBits + pass1Bits)
 
 		tmp10 = tmp0 + tmp3
 		tmp11 = tmp1 + tmp2
 		tmp12 = tmp0 + tmp2
 		tmp13 = tmp1 + tmp3
-		z1 = (tmp12 + tmp13) * fix_1_175875602
+		z1 = (tmp12 + tmp13) * fix1x175875602
 		z1 += 1 << (constBits + pass1Bits - 1)
-		tmp0 *= fix_1_501321110
-		tmp1 *= fix_3_072711026
-		tmp2 *= fix_2_053119869
-		tmp3 *= fix_0_298631336
-		tmp10 *= -fix_0_899976223
-		tmp11 *= -fix_2_562915447
-		tmp12 *= -fix_0_390180644
-		tmp13 *= -fix_1_961570560
+		tmp0 *= fix1x501321110
+		tmp1 *= fix3x072711026
+		tmp2 *= fix2x053119869
+		tmp3 *= fix0x298631336
+		tmp10 *= -fix0x899976223
+		tmp11 *= -fix2x562915447
+		tmp12 *= -fix0x390180644
+		tmp13 *= -fix1x961570560
 
 		tmp12 += z1
 		tmp13 += z1

@@ -1,17 +1,5 @@
 package ultrahdr
 
-// ColorGamut identifies a supported color gamut.
-type ColorGamut int
-
-// GamutUnspecified specifies that the color gamut is not defined or is unspecified.
-const GamutUnspecified ColorGamut = 0
-
-// ColorTransfer identifies a supported transfer function.
-type ColorTransfer int
-
-// TransferLinear represents a linear transfer function where pixel values are interpreted directly without transformation.
-const TransferLinear ColorTransfer = 2
-
 // HDRImage stores a linear-light HDR image in RGB float32.
 // Pixel values are expected to be relative to SDR white (1.0 = SDR white).
 type HDRImage struct {
@@ -19,10 +7,6 @@ type HDRImage struct {
 	Height int
 	Stride int // pixels per row, in RGB triplets
 	Pix    []float32
-	Gamut  ColorGamut
-	// Transfer describes how Pix values should be interpreted if not linear.
-	// For now, the implementation assumes linear and ignores other values.
-	Transfer ColorTransfer
 }
 
 // GainMapMetadata corresponds to the float metadata in the C++ library.
