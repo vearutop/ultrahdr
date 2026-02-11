@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -68,7 +69,7 @@ func runResize(args []string) error {
 		return err
 	}
 	if *inPath == "" || *outPath == "" || *width <= 0 || *height <= 0 {
-		return fmt.Errorf("missing required arguments")
+		return errors.New("missing required arguments")
 	}
 	opts := &ultrahdr.ResizeOptions{
 		BaseQuality:    *q,
@@ -91,7 +92,7 @@ func runRebase(args []string) error {
 		return err
 	}
 	if *inPath == "" || *primaryPath == "" || *outPath == "" {
-		return fmt.Errorf("missing required arguments")
+		return errors.New("missing required arguments")
 	}
 	opts := &ultrahdr.RebaseOptions{
 		BaseQuality:    *q,
@@ -108,7 +109,7 @@ func runDetect(args []string) error {
 		return err
 	}
 	if *inPath == "" {
-		return fmt.Errorf("missing required arguments")
+		return errors.New("missing required arguments")
 	}
 	f, err := os.Open(filepath.Clean(*inPath))
 	if err != nil {
