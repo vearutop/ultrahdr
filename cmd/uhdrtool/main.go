@@ -6,9 +6,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
 
+	"github.com/nfnt/resize"
 	"github.com/vearutop/ultrahdr"
 )
 
@@ -59,12 +61,13 @@ func runResize(args []string) error {
 	fs := flag.NewFlagSet("resize", flag.ContinueOnError)
 	inPath := fs.String("in", "", "input UltraHDR JPEG")
 	outPath := fs.String("out", "", "output UltraHDR JPEG")
-	width := fs.Int("w", 0, "target width")
-	height := fs.Int("h", 0, "target height")
+	width := fs.Uint("w", 0, "target width")
+	height := fs.Uint("h", 0, "target height")
 	q := fs.Int("q", 85, "base quality")
 	gq := fs.Int("gq", 75, "gainmap quality")
 	primaryOut := fs.String("primary-out", "", "write primary JPEG")
 	gainmapOut := fs.String("gainmap-out", "", "write gainmap JPEG")
+	interp := fs.String("interp", "lanczos2", "resize interpolation method, one of: nearest, bilinear, bicubic, lanczos2, lanczos3, mitchell")
 	fs.SetOutput(os.Stderr)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -77,6 +80,29 @@ func runResize(args []string) error {
 		opt.GainmapQuality = *gq
 		opt.PrimaryOut = *primaryOut
 		opt.GainmapOut = *gainmapOut
+
+		intFun := resize.NearestNeighbor
+
+		switch *interp {
+		case "nearest":
+			intFun = resize.NearestNeighbor
+		case "bilinear":
+			intFun = resize.Bilinear
+		case "bicubic":
+			intFun = resize.Bicubic
+		case "lanczos2":
+			intFun = resize.Lanczos2
+		case "lanczos3":
+			intFun = resize.Lanczos3
+		case "mitchell":
+			intFun = resize.MitchellNetravali
+		}
+
+		if intFun != resize.NearestNeighbor {
+			opt.Resize = func(img image.Image, w, h uint) image.Image {
+				return resize.Resize(w, h, img, resize.Lanczos2)
+			}
+		}
 	})
 }
 

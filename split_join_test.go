@@ -68,9 +68,9 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 		t.Fatalf("metadata missing")
 	}
 	// Compare marker sequence and MPF offsets against vips output.
-	vipsData, err := os.ReadFile(filepath.FromSlash("testdata/uh-th.jpg"))
+	vipsData, err := os.ReadFile(filepath.FromSlash("testdata/uhdr.vips_thumb.jpg"))
 	if err != nil {
-		t.Fatalf("read uh-th.jpg: %v", err)
+		t.Fatalf("read uhdr.vips_thumb.jpg: %v", err)
 	}
 	seqWant, err := markerSequence(vipsData)
 	if err != nil {

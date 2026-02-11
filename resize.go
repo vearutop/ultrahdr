@@ -18,7 +18,7 @@ import (
 type ResizeOptions struct {
 	PrimaryQuality int
 	GainmapQuality int
-	Resizer        Resizer
+	Resize         func(img image.Image, w, h uint) image.Image
 	OnResult       func(res *ResizeResult)
 	OnSplit        func(sr *SplitResult)
 	PrimaryOut     string
@@ -34,7 +34,7 @@ type ResizeResult struct {
 
 // ResizeUltraHDR resizes an UltraHDR JPEG container to the requested dimensions.
 // It returns the new container and the resized primary/gainmap JPEGs.
-func ResizeUltraHDR(data []byte, width, height int, opts ...func(o *ResizeOptions)) (*ResizeResult, error) {
+func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptions)) (*ResizeResult, error) {
 	if width <= 0 || height <= 0 {
 		return nil, errors.New("invalid target dimensions")
 	}
@@ -59,12 +59,12 @@ func ResizeUltraHDR(data []byte, width, height int, opts ...func(o *ResizeOption
 		opt.OnSplit(sr)
 	}
 
-	resizer := opt.Resizer
-	primaryThumb, err := resizeJPEG(sr.PrimaryJPEG, width, height, nil, opt.PrimaryQuality, resizer)
+	resize := opt.Resize
+	primaryThumb, err := resizeJPEG(sr.PrimaryJPEG, width, height, nil, opt.PrimaryQuality, resize)
 	if err != nil {
 		return nil, fmt.Errorf("resize primary: %w", err)
 	}
-	gainmapThumb, err := resizeGainmapJPEG(sr.GainmapJPEG, width, height, nil, opt.GainmapQuality, sr.Meta, resizer)
+	gainmapThumb, err := resizeGainmapJPEG(sr.GainmapJPEG, width, height, nil, opt.GainmapQuality, sr.Meta, resize)
 	if err != nil {
 		return nil, fmt.Errorf("resize gainmap: %w", err)
 	}
@@ -93,7 +93,7 @@ func ResizeUltraHDR(data []byte, width, height int, opts ...func(o *ResizeOption
 // ResizeUltraHDRFile reads an UltraHDR JPEG from inPath, resizes it, and writes
 // the container to outPath. If ResizeOptions.PrimaryOut or ResizeOptions.GainmapOut are non-empty, the
 // resized component JPEGs are written as well.
-func ResizeUltraHDRFile(inPath, outPath string, width, height int, opts ...func(opt *ResizeOptions)) error {
+func ResizeUltraHDRFile(inPath, outPath string, width, height uint, opts ...func(opt *ResizeOptions)) error {
 	data, err := os.ReadFile(inPath)
 	if err != nil {
 		return err
@@ -124,30 +124,28 @@ func ResizeUltraHDRFile(inPath, outPath string, width, height int, opts ...func(
 	return nil
 }
 
-// Resizer lets callers provide a custom resize implementation.
+// ResizeFunc lets callers provide a custom resize implementation.
 // The resizer is expected to preserve linear channel values.
-type Resizer interface {
-	Resize(img image.Image, w, h int) image.Image
-}
+type ResizeFunc func(img image.Image, w, h uint) image.Image
 
-func resizeJPEG(jpegData []byte, w, h int, segs []appSegment, quality int, resizer Resizer) ([]byte, error) {
+func resizeJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, resize ResizeFunc) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(jpegData))
 	if err != nil {
 		return nil, err
 	}
 	var outImg image.Image
-	if resizer != nil {
-		outImg = resizer.Resize(img, w, h)
+	if resize != nil {
+		outImg = resize(img, w, h)
 	} else {
 		switch src := img.(type) {
 		case *image.YCbCr:
-			outImg = resizeYCbCrNearest(src, w, h)
+			outImg = resizeYCbCrNearest(src, int(w), int(h))
 		case *image.Gray:
-			dst := image.NewGray(image.Rect(0, 0, w, h))
+			dst := image.NewGray(image.Rect(0, 0, int(w), int(h)))
 			nearestScale(dst, src)
 			outImg = dst
 		default:
-			dst := image.NewRGBA(image.Rect(0, 0, w, h))
+			dst := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
 			nearestScale(dst, img)
 			outImg = dst
 		}
@@ -162,7 +160,7 @@ func resizeJPEG(jpegData []byte, w, h int, segs []appSegment, quality int, resiz
 	return out, nil
 }
 
-func resizeGainmapJPEG(jpegData []byte, w, h int, segs []appSegment, quality int, meta *GainMapMetadata, resizer Resizer) ([]byte, error) {
+func resizeGainmapJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, meta *GainMapMetadata, resize ResizeFunc) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(jpegData))
 	if err != nil {
 		return nil, err
@@ -171,21 +169,21 @@ func resizeGainmapJPEG(jpegData []byte, w, h int, segs []appSegment, quality int
 		return nil, errors.New("gainmap metadata missing")
 	}
 	var outImg image.Image
-	if resizer != nil {
-		outImg, err = resizeGainmapLinear(img, w, h, meta, resizer)
+	if resize != nil {
+		outImg, err = resizeGainmapLinear(img, w, h, meta, resize)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		switch src := img.(type) {
 		case *image.YCbCr:
-			outImg = resizeYCbCrNearest(src, w, h)
+			outImg = resizeYCbCrNearest(src, int(w), int(h))
 		case *image.Gray:
-			dst := image.NewGray(image.Rect(0, 0, w, h))
+			dst := image.NewGray(image.Rect(0, 0, int(w), int(h)))
 			nearestScale(dst, src)
 			outImg = dst
 		default:
-			dst := image.NewRGBA(image.Rect(0, 0, w, h))
+			dst := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
 			nearestScale(dst, img)
 			outImg = dst
 		}
@@ -274,7 +272,7 @@ func encodeWithQuality(img image.Image, quality int) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func resizeGainmapLinear(img image.Image, w, h int, meta *GainMapMetadata, resizer Resizer) (image.Image, error) {
+func resizeGainmapLinear(img image.Image, w, h uint, meta *GainMapMetadata, resize ResizeFunc) (image.Image, error) {
 	if meta == nil {
 		return nil, errors.New("gainmap metadata missing")
 	}
@@ -287,7 +285,7 @@ func resizeGainmapLinear(img image.Image, w, h int, meta *GainMapMetadata, resiz
 				linear.SetGray16(x, y, color.Gray16{Y: toGray16(g)})
 			}
 		}
-		resized := resizer.Resize(linear, w, h)
+		resized := resize(linear, w, h)
 		return encodeGainmapGray(resized, meta.Gamma[0]), nil
 	}
 
@@ -306,7 +304,7 @@ func resizeGainmapLinear(img image.Image, w, h int, meta *GainMapMetadata, resiz
 			})
 		}
 	}
-	resized := resizer.Resize(linear, w, h)
+	resized := resize(linear, w, h)
 	return encodeGainmapRGB(resized, meta.Gamma), nil
 }
 
