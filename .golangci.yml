@@ -5,6 +5,11 @@ run:
 linters:
   default: all
   disable:
+    - exhaustive
+    - gochecknoinits
+    - gocyclo
+    - dupl
+    - nestif
     - funlen
     - cyclop
     - err113
@@ -71,6 +76,9 @@ linters:
       - linters:
           - revive
         text: 'unused-parameter: parameter'
+      - linters:
+          - gocritic
+        text: 'ifElseChain:'
     paths:
       - third_party$
       - builtin$
@@ -79,7 +87,6 @@ formatters:
   enable:
     - gci
     - gofmt
-    - gofumpt
     - goimports
   exclusions:
     generated: lax

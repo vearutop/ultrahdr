@@ -89,12 +89,11 @@ func assembleContainerVipsLike(primaryJPEG, gainmapJPEG []byte, exif []byte, icc
 	isoPrimary := secondaryISO
 	if len(isoPrimary) == 0 {
 		isoPrimary = buildIsoVersionOnly()
-	} else {
+	} else if len(isoPrimary) > len(isoNamespace)+1+4 {
 		// If this is full ISO metadata, keep only version (4 bytes) for primary.
-		if len(isoPrimary) > len(isoNamespace)+1+4 {
-			isoPrimary = append([]byte(nil), isoPrimary[:len(isoNamespace)+1+4]...)
-		}
+		isoPrimary = append([]byte(nil), isoPrimary[:len(isoNamespace)+1+4]...)
 	}
+
 	if len(isoPrimary) > 0 {
 		writeAppSegment(&out, markerAPP2, isoPrimary)
 	}

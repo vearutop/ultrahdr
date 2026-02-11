@@ -2,6 +2,8 @@ package ultrahdr
 
 import "errors"
 
+// SplitResult contains the results of splitting an UltraHDR JPEG container.
+// It includes primary and gainmap JPEGs, parsed gainmap metadata, and raw metadata segments.
 type SplitResult struct {
 	PrimaryJPEG, GainmapJPEG []byte
 	Meta                     *GainMapMetadata

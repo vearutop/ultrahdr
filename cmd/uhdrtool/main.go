@@ -1,3 +1,4 @@
+// Package main is a command-line tool for working with UltraHDR JPEGs.
 package main
 
 import (
@@ -140,7 +141,7 @@ func runSplit(args []string) error {
 		return err
 	}
 	if *inPath == "" || *primaryOut == "" || *gainmapOut == "" {
-		return fmt.Errorf("missing required arguments")
+		return errors.New("missing required arguments")
 	}
 	data, err := os.ReadFile(filepath.Clean(*inPath))
 	if err != nil {
@@ -184,7 +185,7 @@ func runJoin(args []string) error {
 		return err
 	}
 	if *primaryPath == "" || *gainmapPath == "" || *outPath == "" {
-		return fmt.Errorf("missing required arguments")
+		return errors.New("missing required arguments")
 	}
 	primary, err := os.ReadFile(filepath.Clean(*primaryPath))
 	if err != nil {
@@ -210,7 +211,7 @@ func runJoin(args []string) error {
 		return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
 	}
 	if *templatePath == "" {
-		return fmt.Errorf("missing -meta or -template")
+		return errors.New("missing -meta or -template")
 	}
 	template, err := os.ReadFile(filepath.Clean(*templatePath))
 	if err != nil {

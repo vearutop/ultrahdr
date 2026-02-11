@@ -241,11 +241,13 @@ func parseMpfEntries(data []byte) (mpfEntries, error) {
 		return mpfEntries{}, errors.New("mpf entry data truncated")
 	}
 	entries := ifd[entryOffset : entryOffset+mpfEntrySize*mpfNumPictures]
+
 	parse := func(b []byte) (size, offset uint32) {
 		size = binary.BigEndian.Uint32(b[4:8])
 		offset = binary.BigEndian.Uint32(b[8:12])
 		return
 	}
+
 	pSize, pOff := parse(entries[:mpfEntrySize])
 	sSize, sOff := parse(entries[mpfEntrySize:])
 	return mpfEntries{
