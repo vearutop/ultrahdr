@@ -131,7 +131,6 @@ func TestSplitLegacyACRXMP(t *testing.T) {
 	}
 
 	primary, gainmap, meta, segs, err := SplitWithSegments(data)
-
 	if err != nil {
 		t.Fatalf("split uhdr2: %v", err)
 	}

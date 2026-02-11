@@ -627,6 +627,7 @@ type Options struct {
 	Quality int
 }
 
+// SamplingFactor represents horizontal (H) and vertical (V) subsampling factors for a color component in JPEG encoding.
 type SamplingFactor struct {
 	H, V byte
 }

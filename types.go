@@ -3,18 +3,14 @@ package ultrahdr
 // ColorGamut identifies a supported color gamut.
 type ColorGamut int
 
-const (
-	GamutUnspecified ColorGamut = iota
-	GamutBT709
-	GamutDisplayP3
-	GamutBT2100
-)
+// GamutUnspecified specifies that the color gamut is not defined or is unspecified.
+const GamutUnspecified ColorGamut = 0
 
 // ColorTransfer identifies a supported transfer function.
 type ColorTransfer int
 
 // TransferLinear represents a linear transfer function where pixel values are interpreted directly without transformation.
-const TransferLinear = 2
+const TransferLinear ColorTransfer = 2
 
 // HDRImage stores a linear-light HDR image in RGB float32.
 // Pixel values are expected to be relative to SDR white (1.0 = SDR white).
