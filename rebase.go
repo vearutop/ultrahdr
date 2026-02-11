@@ -54,7 +54,7 @@ func RebaseUltraHDR(data []byte, newSDR image.Image, opt *RebaseOptions) (*Rebas
 	}
 
 	gainQ := defaultGainMapQuality
-	baseQ := defaultBaseQuality
+	baseQ := defaultPrimaryQuality
 	if opt != nil {
 		if opt.GainmapQuality > 0 {
 			gainQ = opt.GainmapQuality

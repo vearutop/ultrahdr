@@ -247,17 +247,17 @@ func runJoin(args []string) error {
 	if err != nil {
 		return err
 	}
-	exif, icc, err := ultrahdr.ExtractExifAndIcc(primary)
+	exif, icc, err := ultrahdr.ExtractEXIFAndICC(primary)
 	if err != nil {
 		return err
 	}
 	if len(exif) == 0 && len(icc) == 0 {
-		exif, icc, err = ultrahdr.ExtractExifAndIcc(template)
+		exif, icc, err = ultrahdr.ExtractEXIFAndICC(template)
 		if err != nil {
 			return err
 		}
 	}
-	container, err := ultrahdr.AssembleContainerVipsLike(primary, gainmap, exif, icc, split.Segs.SecondaryXMP, split.Segs.SecondaryISO)
+	container, err := ultrahdr.AssembleContainer(primary, gainmap, exif, icc, split.Segs.SecondaryXMP, split.Segs.SecondaryISO)
 	if err != nil {
 		return err
 	}

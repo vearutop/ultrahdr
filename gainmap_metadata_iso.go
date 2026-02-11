@@ -42,13 +42,6 @@ func (m *gainmapMetadataFrac) allChannelsIdentical() bool {
 	return true
 }
 
-func encodeGainmapMetadataISO(meta *GainMapMetadata) ([]byte, error) {
-	frac := gainmapMetadataFrac{}
-	floatToFrac(meta, &frac)
-
-	return frac.encode()
-}
-
 func decodeGainmapMetadataISO(data []byte) (*GainMapMetadata, error) {
 	var frac gainmapMetadataFrac
 	if err := frac.decode(data); err != nil {
@@ -285,25 +278,4 @@ func fracToFloat(from *gainmapMetadataFrac, to *GainMapMetadata) {
 	}
 	to.HDRCapacityMin = exp2f(float32(from.BaseHdrHeadroomN) / float32(from.BaseHdrHeadroomD))
 	to.HDRCapacityMax = exp2f(float32(from.AltHdrHeadroomN) / float32(from.AltHdrHeadroomD))
-}
-
-func floatToFrac(from *GainMapMetadata, to *gainmapMetadataFrac) {
-	const denom = 1000000.0
-	to.UseBaseColorSpace = from.UseBaseCG
-	for i := 0; i < 3; i++ {
-		to.GainMapMinN[i] = int32(roundf(log2f(from.MinContentBoost[i]) * denom))
-		to.GainMapMinD[i] = uint32(denom)
-		to.GainMapMaxN[i] = int32(roundf(log2f(from.MaxContentBoost[i]) * denom))
-		to.GainMapMaxD[i] = uint32(denom)
-		to.GainMapGammaN[i] = uint32(roundf(from.Gamma[i] * denom))
-		to.GainMapGammaD[i] = uint32(denom)
-		to.BaseOffsetN[i] = int32(roundf(from.OffsetSDR[i] * denom))
-		to.BaseOffsetD[i] = uint32(denom)
-		to.AltOffsetN[i] = int32(roundf(from.OffsetHDR[i] * denom))
-		to.AltOffsetD[i] = uint32(denom)
-	}
-	to.BaseHdrHeadroomN = uint32(roundf(log2f(from.HDRCapacityMin) * denom))
-	to.BaseHdrHeadroomD = uint32(denom)
-	to.AltHdrHeadroomN = uint32(roundf(log2f(from.HDRCapacityMax) * denom))
-	to.AltHdrHeadroomD = uint32(denom)
 }

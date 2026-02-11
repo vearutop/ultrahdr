@@ -2,7 +2,6 @@ package ultrahdr
 
 import (
 	"errors"
-	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -128,44 +127,4 @@ func parseXMP(app1 []byte) (*GainMapMetadata, error) {
 		}
 	}
 	return meta, nil
-}
-
-func generateXmpPrimary(secondaryLength int, meta *GainMapMetadata) []byte {
-	b := strings.Builder{}
-	b.WriteString("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Adobe XMP Core 5.1.2\">")
-	b.WriteString("<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">")
-	b.WriteString("<rdf:Description xmlns:Container=\"http://ns.google.com/photos/1.0/container/\"")
-	b.WriteString(" xmlns:Item=\"http://ns.google.com/photos/1.0/container/item/\"")
-	b.WriteString(" xmlns:hdrgm=\"http://ns.adobe.com/hdr-gain-map/1.0/\"")
-	b.WriteString(" hdrgm:Version=\"")
-	b.WriteString(meta.Version)
-	b.WriteString("\">")
-	b.WriteString("<Container:Directory><rdf:Seq>")
-	b.WriteString("<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Semantic=\"Primary\" Item:Mime=\"image/jpeg\"/></rdf:li>")
-	b.WriteString("<rdf:li rdf:parseType=\"Resource\"><Container:Item Item:Semantic=\"GainMap\" Item:Mime=\"image/jpeg\" Item:Length=\"")
-	b.WriteString(strconv.Itoa(secondaryLength))
-	b.WriteString("\"/></rdf:li>")
-	b.WriteString("</rdf:Seq></Container:Directory>")
-	b.WriteString("</rdf:Description></rdf:RDF></x:xmpmeta>")
-	return []byte(b.String())
-}
-
-func generateXmpSecondary(meta *GainMapMetadata) []byte {
-	b := strings.Builder{}
-	b.WriteString("<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Adobe XMP Core 5.1.2\">")
-	b.WriteString("<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">")
-	b.WriteString("<rdf:Description xmlns:hdrgm=\"http://ns.adobe.com/hdr-gain-map/1.0/\"")
-	b.WriteString(" hdrgm:Version=\"")
-	b.WriteString(meta.Version)
-	b.WriteString("\"")
-	b.WriteString(fmt.Sprintf(" hdrgm:GainMapMin=\"%g\"", log2f(meta.MinContentBoost[0])))
-	b.WriteString(fmt.Sprintf(" hdrgm:GainMapMax=\"%g\"", log2f(meta.MaxContentBoost[0])))
-	b.WriteString(fmt.Sprintf(" hdrgm:Gamma=\"%g\"", meta.Gamma[0]))
-	b.WriteString(fmt.Sprintf(" hdrgm:OffsetSDR=\"%g\"", meta.OffsetSDR[0]))
-	b.WriteString(fmt.Sprintf(" hdrgm:OffsetHDR=\"%g\"", meta.OffsetHDR[0]))
-	b.WriteString(fmt.Sprintf(" hdrgm:HDRCapacityMin=\"%g\"", log2f(meta.HDRCapacityMin)))
-	b.WriteString(fmt.Sprintf(" hdrgm:HDRCapacityMax=\"%g\"", log2f(meta.HDRCapacityMax)))
-	b.WriteString(" hdrgm:BaseRenditionIsHDR=\"False\"/>")
-	b.WriteString("</rdf:RDF></x:xmpmeta>")
-	return []byte(b.String())
 }

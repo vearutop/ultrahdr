@@ -11,7 +11,3 @@ func srgbInvOetf(v float32) float32 {
 	}
 	return float32(math.Pow(float64((v+0.055)/1.055), 2.4))
 }
-
-func roundf(v float32) float32 {
-	return float32(math.Round(float64(v)))
-}
