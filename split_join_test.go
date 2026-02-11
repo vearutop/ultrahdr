@@ -30,7 +30,7 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("repack join: %v", err)
 	}
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_repacked.jpg"), repacked, 0644); err != nil {
+	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_repacked.jpg"), repacked, 0o644); err != nil {
 		t.Fatalf("write uhdr_repacked.jpg: %v", err)
 	}
 
@@ -48,13 +48,13 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	primaryThumb := resized.Primary
 	gainmapThumb := resized.Gainmap
 
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb.jpg"), container, 0644); err != nil {
+	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb.jpg"), container, 0o644); err != nil {
 		t.Fatalf("write uhdr_thumb.jpg: %v", err)
 	}
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb_primary.jpg"), primaryThumb, 0644); err != nil {
+	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb_primary.jpg"), primaryThumb, 0o644); err != nil {
 		t.Fatalf("write uhdr_thumb_primary.jpg: %v", err)
 	}
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb_gainmap.jpg"), gainmapThumb, 0644); err != nil {
+	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb_gainmap.jpg"), gainmapThumb, 0o644); err != nil {
 		t.Fatalf("write uhdr_thumb_gainmap.jpg: %v", err)
 	}
 

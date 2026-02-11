@@ -113,16 +113,16 @@ func RebaseUltraHDRFile(inPath, newSDRPath, outPath string, opt *RebaseOptions, 
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(outPath), res.Container, 0644); err != nil {
+	if err := os.WriteFile(filepath.Clean(outPath), res.Container, 0o644); err != nil {
 		return err
 	}
 	if primaryOut != "" {
-		if err := os.WriteFile(filepath.Clean(primaryOut), res.Primary, 0644); err != nil {
+		if err := os.WriteFile(filepath.Clean(primaryOut), res.Primary, 0o644); err != nil {
 			return err
 		}
 	}
 	if gainmapOut != "" {
-		if err := os.WriteFile(filepath.Clean(gainmapOut), res.Gainmap, 0644); err != nil {
+		if err := os.WriteFile(filepath.Clean(gainmapOut), res.Gainmap, 0o644); err != nil {
 			return err
 		}
 	}

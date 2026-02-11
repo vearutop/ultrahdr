@@ -89,16 +89,16 @@ func ResizeUltraHDRFile(inPath, outPath string, width, height int, opt *ResizeOp
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(outPath), resized.Container, 0644); err != nil {
+	if err := os.WriteFile(filepath.Clean(outPath), resized.Container, 0o644); err != nil {
 		return err
 	}
 	if primaryOut != "" {
-		if err := os.WriteFile(filepath.Clean(primaryOut), resized.Primary, 0644); err != nil {
+		if err := os.WriteFile(filepath.Clean(primaryOut), resized.Primary, 0o644); err != nil {
 			return err
 		}
 	}
 	if gainmapOut != "" {
-		if err := os.WriteFile(filepath.Clean(gainmapOut), resized.Gainmap, 0644); err != nil {
+		if err := os.WriteFile(filepath.Clean(gainmapOut), resized.Gainmap, 0o644); err != nil {
 			return err
 		}
 	}

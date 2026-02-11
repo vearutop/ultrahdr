@@ -148,10 +148,10 @@ func runSplit(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*primaryOut), primary, 0644); err != nil {
+	if err := os.WriteFile(filepath.Clean(*primaryOut), primary, 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*gainmapOut), gainmap, 0644); err != nil {
+	if err := os.WriteFile(filepath.Clean(*gainmapOut), gainmap, 0o644); err != nil {
 		return err
 	}
 	if *metaOut != "" {
@@ -163,7 +163,7 @@ func runSplit(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Clean(*metaOut), payload, 0644); err != nil {
+		if err := os.WriteFile(filepath.Clean(*metaOut), payload, 0o644); err != nil {
 			return err
 		}
 	}
@@ -205,7 +205,7 @@ func runJoin(args []string) error {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Clean(*outPath), container, 0644)
+		return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
 	}
 	if *templatePath == "" {
 		return fmt.Errorf("missing -meta or -template")
@@ -232,7 +232,7 @@ func runJoin(args []string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Clean(*outPath), container, 0644)
+	return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
 }
 
 func fail(err error) {
