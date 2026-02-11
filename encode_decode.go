@@ -3,7 +3,7 @@ package ultrahdr
 import (
 	"image"
 	"image/color"
-	_ "image/jpeg"
+	_ "image/jpeg" // Register JPEG decoder.
 )
 
 type rgb struct {

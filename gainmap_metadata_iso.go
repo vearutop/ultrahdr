@@ -29,19 +29,6 @@ type gainmapMetadataFrac struct {
 	UseBaseColorSpace bool
 }
 
-func (m *gainmapMetadataFrac) allChannelsIdentical() bool {
-	for i := 1; i < 3; i++ {
-		if m.GainMapMinN[0] != m.GainMapMinN[i] || m.GainMapMinD[0] != m.GainMapMinD[i] ||
-			m.GainMapMaxN[0] != m.GainMapMaxN[i] || m.GainMapMaxD[0] != m.GainMapMaxD[i] ||
-			m.GainMapGammaN[0] != m.GainMapGammaN[i] || m.GainMapGammaD[0] != m.GainMapGammaD[i] ||
-			m.BaseOffsetN[0] != m.BaseOffsetN[i] || m.BaseOffsetD[0] != m.BaseOffsetD[i] ||
-			m.AltOffsetN[0] != m.AltOffsetN[i] || m.AltOffsetD[0] != m.AltOffsetD[i] {
-			return false
-		}
-	}
-	return true
-}
-
 func decodeGainmapMetadataISO(data []byte) (*GainMapMetadata, error) {
 	var frac gainmapMetadataFrac
 	if err := frac.decode(data); err != nil {
@@ -51,76 +38,6 @@ func decodeGainmapMetadataISO(data []byte) (*GainMapMetadata, error) {
 	fracToFloat(&frac, &meta)
 
 	return &meta, nil
-}
-
-func (m *gainmapMetadataFrac) encode() ([]byte, error) {
-	out := make([]byte, 0, 128)
-	writeU16 := func(v uint16) { out = binary.BigEndian.AppendUint16(out, v) }
-	writeU32 := func(v uint32) { out = binary.BigEndian.AppendUint32(out, v) }
-	writeS32 := func(v int32) { out = binary.BigEndian.AppendUint32(out, uint32(v)) }
-	writeU8 := func(v uint8) { out = append(out, v) }
-
-	writeU16(0) // min_version
-	writeU16(0) // writer_version
-
-	flags := uint8(0)
-	channelCount := uint8(1)
-	if !m.allChannelsIdentical() {
-		channelCount = 3
-		flags |= isoIsMultiChannelMask
-	}
-	if m.UseBaseColorSpace {
-		flags |= isoUseBaseColorMask
-	}
-	if m.BackwardDirection {
-		flags |= 4
-	}
-
-	denom := m.BaseHdrHeadroomD
-	useCommon := m.BaseHdrHeadroomD == denom && m.AltHdrHeadroomD == denom
-
-	for c := 0; c < int(channelCount); c++ {
-		if m.GainMapMinD[c] != denom || m.GainMapMaxD[c] != denom || m.GainMapGammaD[c] != denom ||
-			m.BaseOffsetD[c] != denom || m.AltOffsetD[c] != denom {
-			useCommon = false
-		}
-	}
-	if useCommon {
-		flags |= 8
-	}
-	writeU8(flags)
-
-	if useCommon {
-		writeU32(denom)
-		writeU32(m.BaseHdrHeadroomN)
-		writeU32(m.AltHdrHeadroomN)
-		for c := 0; c < int(channelCount); c++ {
-			writeS32(m.GainMapMinN[c])
-			writeS32(m.GainMapMaxN[c])
-			writeU32(m.GainMapGammaN[c])
-			writeS32(m.BaseOffsetN[c])
-			writeS32(m.AltOffsetN[c])
-		}
-		return out, nil
-	}
-
-	writeU32(m.BaseHdrHeadroomN)
-	writeU32(m.BaseHdrHeadroomD)
-	writeU32(m.AltHdrHeadroomN)
-	writeU32(m.AltHdrHeadroomD)
-	for c := 0; c < int(channelCount); c++ {
-		writeS32(m.GainMapMinN[c])
-		writeU32(m.GainMapMinD[c])
-		writeS32(m.GainMapMaxN[c])
-		writeU32(m.GainMapMaxD[c])
-		writeU32(m.GainMapGammaN[c])
-		writeU32(m.GainMapGammaD[c])
-		writeS32(m.BaseOffsetN[c])
-		writeU32(m.BaseOffsetD[c])
-		writeS32(m.AltOffsetN[c])
-		writeU32(m.AltOffsetD[c])
-	}
-	return out, nil
 }
 
 func (m *gainmapMetadataFrac) decode(in []byte) error {
