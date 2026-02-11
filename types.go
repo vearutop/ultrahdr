@@ -13,13 +13,8 @@ const (
 // ColorTransfer identifies a supported transfer function.
 type ColorTransfer int
 
-const (
-	TransferUnspecified ColorTransfer = iota
-	TransferSRGB
-	TransferLinear
-	TransferPQ
-	TransferHLG
-)
+// TransferLinear represents a linear transfer function where pixel values are interpreted directly without transformation.
+const TransferLinear = 2
 
 // HDRImage stores a linear-light HDR image in RGB float32.
 // Pixel values are expected to be relative to SDR white (1.0 = SDR white).

@@ -2,16 +2,6 @@ package ultrahdr
 
 import "math"
 
-func clamp(v, min, max float32) float32 {
-	if v < min {
-		return min
-	}
-	if v > max {
-		return max
-	}
-	return v
-}
-
 func log2f(v float32) float32 { return float32(math.Log2(float64(v))) }
 func exp2f(v float32) float32 { return float32(math.Exp2(float64(v))) }
 

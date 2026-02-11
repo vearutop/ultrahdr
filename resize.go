@@ -80,6 +80,7 @@ func ResizeUltraHDR(data []byte, width, height int, opt *ResizeOptions) (*Resize
 // ResizeUltraHDRFile reads an UltraHDR JPEG from inPath, resizes it, and writes
 // the container to outPath. If primaryOut or gainmapOut are non-empty, the
 // resized component JPEGs are written as well.
+// TODO: ergonomic options.
 func ResizeUltraHDRFile(inPath, outPath string, width, height int, opt *ResizeOptions, primaryOut, gainmapOut string) error {
 	data, err := os.ReadFile(filepath.Clean(inPath))
 	if err != nil {
