@@ -55,9 +55,8 @@ func decodeGainmapMetadataISO(data []byte) (*GainMapMetadata, error) {
 		return nil, err
 	}
 	meta := GainMapMetadata{Version: jpegrVersion}
-	if err := fracToFloat(&frac, &meta); err != nil {
-		return nil, err
-	}
+	fracToFloat(&frac, &meta)
+
 	return &meta, nil
 }
 
@@ -276,7 +275,7 @@ func (m *gainmapMetadataFrac) decode(in []byte) error {
 	return nil
 }
 
-func fracToFloat(from *gainmapMetadataFrac, to *GainMapMetadata) error {
+func fracToFloat(from *gainmapMetadataFrac, to *GainMapMetadata) {
 	to.UseBaseCG = from.UseBaseColorSpace
 	for i := 0; i < 3; i++ {
 		to.MinContentBoost[i] = exp2f(float32(from.GainMapMinN[i]) / float32(from.GainMapMinD[i]))
@@ -287,7 +286,6 @@ func fracToFloat(from *gainmapMetadataFrac, to *GainMapMetadata) error {
 	}
 	to.HDRCapacityMin = exp2f(float32(from.BaseHdrHeadroomN) / float32(from.BaseHdrHeadroomD))
 	to.HDRCapacityMax = exp2f(float32(from.AltHdrHeadroomN) / float32(from.AltHdrHeadroomD))
-	return nil
 }
 
 func floatToFrac(from *GainMapMetadata, to *gainmapMetadataFrac) {

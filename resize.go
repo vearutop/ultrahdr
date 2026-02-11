@@ -240,7 +240,7 @@ func nearestScale(dst draw.Image, src image.Image) {
 
 func encodeWithQuality(img image.Image, quality int) ([]byte, error) {
 	var buf bytes.Buffer
-	opt := &jpegx.EncoderOptions{
+	opt := jpegx.EncoderOptions{
 		Quality:        quality,
 		UseQuantTables: false,
 		UseHuffman:     false,

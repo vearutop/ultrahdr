@@ -50,10 +50,7 @@ func Encode(hdr *HDRImage, sdr image.Image, opts *EncodeOptions) ([]byte, *GainM
 		meta.HDRCapacityMax = meta.MaxContentBoost[0]
 	}
 
-	gainmapImg, err := generateGainMap(hdr, sdr, meta, opt)
-	if err != nil {
-		return nil, nil, err
-	}
+	gainmapImg := generateGainMap(hdr, sdr, meta, opt)
 
 	var baseBuf bytes.Buffer
 	if err := jpeg.Encode(&baseBuf, sdr, &jpeg.Options{Quality: opt.Quality}); err != nil {
@@ -139,7 +136,7 @@ func applyEncodeDefaults(opts *EncodeOptions) EncodeOptions {
 	return *opts
 }
 
-func generateGainMap(hdr *HDRImage, sdr image.Image, meta *GainMapMetadata, opt EncodeOptions) (image.Image, error) {
+func generateGainMap(hdr *HDRImage, sdr image.Image, meta *GainMapMetadata, opt EncodeOptions) image.Image {
 	mapW := hdr.Width / opt.GainMapScale
 	mapH := hdr.Height / opt.GainMapScale
 	if mapW == 0 || mapH == 0 {
@@ -163,7 +160,7 @@ func generateGainMap(hdr *HDRImage, sdr image.Image, meta *GainMapMetadata, opt 
 				img.SetRGBA(x, y, color.RGBA{R: r, G: g, B: b, A: 255})
 			}
 		}
-		return img, nil
+		return img
 	}
 
 	img := image.NewGray(image.Rect(0, 0, mapW, mapH))
@@ -185,7 +182,7 @@ func generateGainMap(hdr *HDRImage, sdr image.Image, meta *GainMapMetadata, opt 
 			img.SetGray(x, y, color.Gray{Y: v})
 		}
 	}
-	return img, nil
+	return img
 }
 
 func sampleSDR(img image.Image, x, y int) rgb {

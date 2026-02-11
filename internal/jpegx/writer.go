@@ -686,7 +686,7 @@ func Encode(w io.Writer, m image.Image, o *Options) error {
 }
 
 // EncodeWithTables writes JPEG using custom quantization and Huffman tables.
-func EncodeWithTables(w io.Writer, m image.Image, o *EncoderOptions) error {
+func EncodeWithTables(w io.Writer, m image.Image, o EncoderOptions) error {
 	b := m.Bounds()
 	if b.Dx() >= 1<<16 || b.Dy() >= 1<<16 {
 		return errors.New("jpeg: image is too large to encode")
@@ -704,13 +704,13 @@ func EncodeWithTables(w io.Writer, m image.Image, o *EncoderOptions) error {
 	if _, ok := m.(*image.Gray); ok {
 		nComponent = 1
 	}
-	if o != nil && o.SplitDQT {
+	if o.SplitDQT {
 		e.writeDQTSeparate()
 	} else {
 		e.writeDQT()
 	}
 	e.writeSOF0(b.Size(), nComponent)
-	if o != nil && o.SplitDHT {
+	if o.SplitDHT {
 		e.writeDHTSeparate(nComponent)
 	} else {
 		e.writeDHT(nComponent)
@@ -758,11 +758,8 @@ func initDefaultEncoder(e *encoder, o *Options) {
 	}
 }
 
-func initEncoderWithOptions(e *encoder, o *EncoderOptions) {
+func initEncoderWithOptions(e *encoder, o EncoderOptions) {
 	initDefaultEncoder(e, &Options{Quality: o.Quality})
-	if o == nil {
-		return
-	}
 	if o.UseQuantTables {
 		e.quant = o.QuantTables
 	}
