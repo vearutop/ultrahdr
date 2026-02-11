@@ -29,18 +29,18 @@ func RebaseUltraHDR(data []byte, newSDR image.Image, opt *RebaseOptions) (*Rebas
 	if newSDR == nil {
 		return nil, errors.New("new SDR image is nil")
 	}
-	primaryJPEG, gainmapJPEG, meta, segs, err := SplitWithSegments(data)
+	split, err := Split(data)
 	if err != nil {
 		return nil, err
 	}
-	if meta == nil {
+	if split.Meta == nil {
 		return nil, errors.New("gainmap metadata missing")
 	}
-	oldSDR, _, err := image.Decode(bytes.NewReader(primaryJPEG))
+	oldSDR, _, err := image.Decode(bytes.NewReader(split.PrimaryJPEG))
 	if err != nil {
 		return nil, err
 	}
-	gainmapImg, _, err := image.Decode(bytes.NewReader(gainmapJPEG))
+	gainmapImg, _, err := image.Decode(bytes.NewReader(split.GainmapJPEG))
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func RebaseUltraHDR(data []byte, newSDR image.Image, opt *RebaseOptions) (*Rebas
 		return nil, errors.New("new SDR dimensions must match original")
 	}
 
-	gainmapOut, err := rebaseGainmap(oldSDR, newSDR, gainmapImg, meta)
+	gainmapOut, err := rebaseGainmap(oldSDR, newSDR, gainmapImg, split.Meta)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +78,12 @@ func RebaseUltraHDR(data []byte, newSDR image.Image, opt *RebaseOptions) (*Rebas
 		return nil, err
 	}
 	if len(exif) == 0 && len(icc) == 0 {
-		exif, icc, err = extractExifAndIcc(primaryJPEG)
+		exif, icc, err = extractExifAndIcc(split.PrimaryJPEG)
 		if err != nil {
 			return nil, err
 		}
 	}
-	container, err := assembleContainerVipsLike(primaryOut, gainmapJpeg, exif, icc, segs.SecondaryXMP, segs.SecondaryISO)
+	container, err := assembleContainerVipsLike(primaryOut, gainmapJpeg, exif, icc, split.Segs.SecondaryXMP, split.Segs.SecondaryISO)
 	if err != nil {
 		return nil, err
 	}

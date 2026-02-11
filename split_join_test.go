@@ -9,35 +9,40 @@ import (
 	"testing"
 )
 
-func TestResizeUltraHDRFile(t *testing.T) {
-	if err := ResizeUltraHDRFile("testdata/uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
-		&ResizeOptions{
-			BaseQuality:    85,
-			GainmapQuality: 65,
-		},
-		"testdata/uhdr_thumb_primary.jpg", "testdata/uhdr_thumb_gainmap.jpg"); err != nil {
+func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
+	var (
+		result *ResizeResult
+		split  *SplitResult
+	)
+
+	// Use a known valid UltraHDR JPEG.
+	err := ResizeUltraHDRFile("testdata/uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
+		func(opts *ResizeOptions) {
+			opts.OnResult = func(res *ResizeResult) {
+				result = res
+			}
+			opts.OnSplit = func(sr *SplitResult) {
+				split = sr
+			}
+		})
+	if err != nil {
 		t.Fatalf("resize uhdr: %v", err)
 	}
-}
 
-func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
-	// Use a known valid UltraHDR JPEG.
-	uhdrPath := filepath.FromSlash("testdata/uhdr.jpg")
-	data, err := os.ReadFile(uhdrPath)
-	if err != nil {
-		t.Fatalf("read uhdr jpeg: %v", err)
+	if result == nil {
+		t.Fatalf("resize result missing")
 	}
 
-	primary, gainmap, meta, segs, err := SplitWithSegments(data)
-	if err != nil {
-		t.Fatalf("split: %v", err)
+	if split == nil {
+		t.Fatalf("split result missing")
 	}
-	if meta == nil {
+
+	if split.Meta == nil {
 		t.Fatalf("metadata missing")
 	}
 
 	// Repack without re-encoding to validate container assembly only.
-	repacked, err := JoinWithSegments(primary, gainmap, segs)
+	repacked, err := split.Join()
 	if err != nil {
 		t.Fatalf("repack join: %v", err)
 	}
@@ -45,34 +50,14 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 		t.Fatalf("write uhdr_repacked.jpg: %v", err)
 	}
 
-	// Resize both primary and gainmap to create a thumbnail.
-	// Resize to 2400px wide, keep 3:2 aspect.
-	const thumbW, thumbH = 2400, 1600
-	resized, err := ResizeUltraHDR(data, thumbW, thumbH, &ResizeOptions{
-		BaseQuality:    85,
-		GainmapQuality: 75,
-	})
-	if err != nil {
-		t.Fatalf("resize ultrahdr: %v", err)
-	}
-	container := resized.Container
-	primaryThumb := resized.Primary
-	gainmapThumb := resized.Gainmap
-
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb.jpg"), container, 0o644); err != nil {
-		t.Fatalf("write uhdr_thumb.jpg: %v", err)
-	}
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb_primary.jpg"), primaryThumb, 0o644); err != nil {
-		t.Fatalf("write uhdr_thumb_primary.jpg: %v", err)
-	}
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_thumb_gainmap.jpg"), gainmapThumb, 0o644); err != nil {
-		t.Fatalf("write uhdr_thumb_gainmap.jpg: %v", err)
-	}
-
-	p2, g2, meta2, err := Split(container)
+	sr2, err := Split(result.Container)
 	if err != nil {
 		t.Fatalf("split after join: %v", err)
 	}
+	p2 := sr2.PrimaryJPEG
+	g2 := sr2.GainmapJPEG
+	meta2 := sr2.Meta
+
 	if len(p2) < 4 || p2[0] != 0xFF || p2[1] != 0xD8 || p2[len(p2)-2] != 0xFF || p2[len(p2)-1] != 0xD9 {
 		t.Fatalf("primary jpeg invalid markers")
 	}
@@ -91,7 +76,7 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marker sequence vips: %v", err)
 	}
-	seqGot, err := markerSequence(container)
+	seqGot, err := markerSequence(result.Container)
 	if err != nil {
 		t.Fatalf("marker sequence got: %v", err)
 	}
@@ -102,66 +87,15 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse mpf vips: %v", err)
 	}
-	gotMpf, err := parseMpfEntries(container)
+	gotMpf, err := parseMpfEntries(result.Container)
 	if err != nil {
 		t.Fatalf("parse mpf got: %v", err)
 	}
 	if err := validateMpfEntries(vipsData, wantMpf); err != nil {
 		t.Fatalf("mpf vips invalid: %v", err)
 	}
-	if err := validateMpfEntries(container, gotMpf); err != nil {
+	if err := validateMpfEntries(result.Container, gotMpf); err != nil {
 		t.Fatalf("mpf output invalid: %v", err)
-	}
-}
-
-func TestSplitLegacyACRXMP(t *testing.T) {
-	data, err := os.ReadFile(filepath.FromSlash("testdata/uhdr2.jpg"))
-	if err != nil {
-		t.Fatalf("read uhdr2 jpeg: %v", err)
-	}
-	{
-		r := bytes.NewReader(data)
-		ok, err := IsUltraHDR(r)
-		if err != nil {
-			t.Fatalf("detect uhdr2: %v", err)
-		}
-		if !ok {
-			t.Fatalf("expected uhdr2 to be detected as UltraHDR")
-		}
-	}
-
-	primary, gainmap, meta, segs, err := SplitWithSegments(data)
-	if err != nil {
-		t.Fatalf("split uhdr2: %v", err)
-	}
-	if len(primary) == 0 || len(gainmap) == 0 {
-		t.Fatalf("split uhdr2: missing images")
-	}
-	if meta == nil {
-		t.Fatalf("split uhdr2: metadata missing")
-	}
-	if meta.MaxContentBoost[0] <= 1.0 {
-		t.Fatalf("split uhdr2: invalid max content boost")
-	}
-	if meta.HDRCapacityMax <= 1.0 {
-		t.Fatalf("split uhdr2: invalid hdr capacity max")
-	}
-	// Repack without re-encoding to validate container assembly only.
-	repacked, err := JoinWithSegments(primary, gainmap, segs)
-	if err != nil {
-		t.Fatalf("repack join: %v", err)
-	}
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr2_repacked.jpg"), repacked, 0o644); err != nil {
-		t.Fatalf("write uhdr2_repacked.jpg: %v", err)
-	}
-
-	if err := ResizeUltraHDRFile("testdata/uhdr2.jpg", "testdata/uhdr2_thumb.jpg", 2400, 1600,
-		&ResizeOptions{
-			BaseQuality:    85,
-			GainmapQuality: 75,
-		},
-		"testdata/uhdr2_thumb_primary.jpg", "testdata/uhdr2_thumb_gainmap.jpg"); err != nil {
-		t.Fatalf("resize uhdr2: %v", err)
 	}
 }
 

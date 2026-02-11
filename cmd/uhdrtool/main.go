@@ -71,11 +71,12 @@ func runResize(args []string) error {
 	if *inPath == "" || *outPath == "" || *width <= 0 || *height <= 0 {
 		return errors.New("missing required arguments")
 	}
-	opts := &ultrahdr.ResizeOptions{
-		BaseQuality:    *q,
-		GainmapQuality: *gq,
-	}
-	return ultrahdr.ResizeUltraHDRFile(*inPath, *outPath, *width, *height, opts, *primaryOut, *gainmapOut)
+	return ultrahdr.ResizeUltraHDRFile(*inPath, *outPath, *width, *height, func(opt *ultrahdr.ResizeOptions) {
+		opt.PrimaryQuality = *q
+		opt.GainmapQuality = *gq
+		opt.PrimaryOut = *primaryOut
+		opt.GainmapOut = *gainmapOut
+	})
 }
 
 func runRebase(args []string) error {
@@ -145,18 +146,18 @@ func runSplit(args []string) error {
 	if err != nil {
 		return err
 	}
-	primary, gainmap, _, segs, err := ultrahdr.SplitWithSegments(data)
+	split, err := ultrahdr.Split(data)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*primaryOut), primary, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Clean(*primaryOut), split.PrimaryJPEG, 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*gainmapOut), gainmap, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Clean(*gainmapOut), split.GainmapJPEG, 0o644); err != nil {
 		return err
 	}
 	if *metaOut != "" {
-		bundle, err := ultrahdr.BuildMetadataBundle(primary, segs)
+		bundle, err := ultrahdr.BuildMetadataBundle(split.PrimaryJPEG, split.Segs)
 		if err != nil {
 			return err
 		}
@@ -215,7 +216,7 @@ func runJoin(args []string) error {
 	if err != nil {
 		return err
 	}
-	_, _, _, segs, err := ultrahdr.SplitWithSegments(template)
+	split, err := ultrahdr.Split(template)
 	if err != nil {
 		return err
 	}
@@ -229,7 +230,7 @@ func runJoin(args []string) error {
 			return err
 		}
 	}
-	container, err := ultrahdr.AssembleContainerVipsLike(primary, gainmap, exif, icc, segs.SecondaryXMP, segs.SecondaryISO)
+	container, err := ultrahdr.AssembleContainerVipsLike(primary, gainmap, exif, icc, split.Segs.SecondaryXMP, split.Segs.SecondaryISO)
 	if err != nil {
 		return err
 	}

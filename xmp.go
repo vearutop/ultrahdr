@@ -68,15 +68,15 @@ func parseXMP(app1 []byte) (*GainMapMetadata, error) {
 	} else if ok {
 		meta.MaxContentBoost[0] = exp2f(v)
 	} else {
-		if err := parseXmpSeqValues(xml, meta); err != nil {
-			return nil, err
-		}
+		return nil, errors.New("xmp missing GainMapMax")
 	}
 
 	if v, ok, err := getFloat(reHDRCapMax); err != nil {
 		return nil, err
 	} else if ok {
 		meta.HDRCapacityMax = exp2f(v)
+	} else {
+		return nil, errors.New("xmp missing HDRCapacityMax")
 	}
 
 	if v, ok, err := getFloat(reGainMapMin); err != nil {
