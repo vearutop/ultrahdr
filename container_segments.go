@@ -42,7 +42,7 @@ func assembleContainerWithSegments(primaryJPEG, gainmapJPEG []byte, segs *Metada
 	mpfLen := 2 + calculateMpfSize()
 	primaryImageSize := out.Len() + mpfLen + len(primaryJPEG)
 	secondaryOffset := primaryImageSize - out.Len() - 8
-	mpf := generateMpf(primaryImageSize, 0, secondaryImageSize, secondaryOffset)
+	mpf := generateMpf(primaryImageSize, secondaryImageSize, secondaryOffset)
 	writeAppSegment(&out, markerAPP2, mpf)
 
 	out.Write(primaryJPEG[2:])
@@ -102,7 +102,7 @@ func assembleContainerVipsLike(primaryJPEG, gainmapJPEG []byte, exif []byte, icc
 	mpfLen := 2 + calculateMpfSize()
 	primaryImageSize := out.Len() + mpfLen + len(primaryStripped)
 	secondaryOffset := primaryImageSize - out.Len() - 8
-	mpf := generateMpf(primaryImageSize, 0, secondaryImageSize, secondaryOffset)
+	mpf := generateMpf(primaryImageSize, secondaryImageSize, secondaryOffset)
 	writeAppSegment(&out, markerAPP2, mpf)
 
 	for _, seg := range icc {
@@ -240,7 +240,7 @@ func replaceMpfPayload(data []byte) error {
 	secondarySize := ranges[1][1] - ranges[1][0]
 	secondaryOffset := ranges[1][0] - (mpfStart + 4) // relative to TIFF header
 
-	newMpf := generateMpf(primarySize, 0, secondarySize, secondaryOffset)
+	newMpf := generateMpf(primarySize, secondarySize, secondaryOffset)
 	if len(newMpf) != mpfLen {
 		return errors.New("mpf size mismatch")
 	}

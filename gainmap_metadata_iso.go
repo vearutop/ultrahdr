@@ -44,9 +44,8 @@ func (m *gainmapMetadataFrac) allChannelsIdentical() bool {
 
 func encodeGainmapMetadataISO(meta *GainMapMetadata) ([]byte, error) {
 	frac := gainmapMetadataFrac{}
-	if err := floatToFrac(meta, &frac); err != nil {
-		return nil, err
-	}
+	floatToFrac(meta, &frac)
+
 	return frac.encode()
 }
 
@@ -291,7 +290,7 @@ func fracToFloat(from *gainmapMetadataFrac, to *GainMapMetadata) error {
 	return nil
 }
 
-func floatToFrac(from *GainMapMetadata, to *gainmapMetadataFrac) error {
+func floatToFrac(from *GainMapMetadata, to *gainmapMetadataFrac) {
 	const denom = 1000000.0
 	to.UseBaseColorSpace = from.UseBaseCG
 	for i := 0; i < 3; i++ {
@@ -310,5 +309,4 @@ func floatToFrac(from *GainMapMetadata, to *gainmapMetadataFrac) error {
 	to.BaseHdrHeadroomD = uint32(denom)
 	to.AltHdrHeadroomN = uint32(roundf(log2f(from.HDRCapacityMax) * denom))
 	to.AltHdrHeadroomD = uint32(denom)
-	return nil
 }

@@ -32,7 +32,7 @@ func calculateMpfSize() int {
 	return len(mpfSig) + mpfEndianSize + 4 + 2 + mpfTagCount*mpfTagSize + 4 + mpfNumPictures*mpfEntrySize
 }
 
-func generateMpf(primarySize, primaryOffset, secondarySize, secondaryOffset int) []byte {
+func generateMpf(primarySize, secondarySize, secondaryOffset int) []byte {
 	buf := make([]byte, 0, calculateMpfSize())
 	putU16 := func(v uint16) { tmp := make([]byte, 2); binary.BigEndian.PutUint16(tmp, v); buf = append(buf, tmp...) }
 	putU32 := func(v uint32) { tmp := make([]byte, 4); binary.BigEndian.PutUint32(tmp, v); buf = append(buf, tmp...) }
@@ -71,7 +71,7 @@ func generateMpf(primarySize, primaryOffset, secondarySize, secondaryOffset int)
 	// Primary entry
 	putU32(mpfAttrFormatJpeg | mpfAttrTypePrimary)
 	putU32(uint32(primarySize))
-	putU32(uint32(primaryOffset))
+	putU32(uint32(0))
 	putU16(0)
 	putU16(0)
 

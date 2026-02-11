@@ -367,7 +367,7 @@ func assembleContainer(primaryJPEG, gainmapJPEG []byte, meta *GainMapMetadata) (
 	mpfLen := 2 + calculateMpfSize()
 	primaryImageSize := out.Len() + mpfLen + len(primaryJPEG)
 	secondaryOffset := primaryImageSize - out.Len() - 8
-	mpf := generateMpf(primaryImageSize, 0, secondaryImageSize, secondaryOffset)
+	mpf := generateMpf(primaryImageSize, secondaryImageSize, secondaryOffset)
 	writeAPP(markerAPP2, mpf)
 
 	// Primary image (skip SOI)
