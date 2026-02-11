@@ -82,11 +82,10 @@ func (m *gainmapMetadataFrac) encode() ([]byte, error) {
 	if m.BackwardDirection {
 		flags |= 4
 	}
+
 	denom := m.BaseHdrHeadroomD
-	useCommon := true
-	if m.BaseHdrHeadroomD != denom || m.AltHdrHeadroomD != denom {
-		useCommon = false
-	}
+	useCommon := m.BaseHdrHeadroomD == denom && m.AltHdrHeadroomD == denom
+
 	for c := 0; c < int(channelCount); c++ {
 		if m.GainMapMinD[c] != denom || m.GainMapMaxD[c] != denom || m.GainMapGammaD[c] != denom ||
 			m.BaseOffsetD[c] != denom || m.AltOffsetD[c] != denom {
