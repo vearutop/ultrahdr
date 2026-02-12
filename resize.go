@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"image/color"
 	"image/draw"
 	"math"
 	"os"
@@ -322,58 +321,6 @@ func gainmapDecodeValue(v uint8, gamma float32) float32 {
 		g = float32(math.Pow(float64(g), float64(1.0/gamma)))
 	}
 	return clamp01(g)
-}
-
-func gainmapEncodeValue(v float32, gamma float32) uint8 {
-	g := clamp01(v)
-	if gamma != 1 {
-		g = float32(math.Pow(float64(g), float64(gamma)))
-	}
-	val := g * 255.0
-	if val < 0 {
-		val = 0
-	}
-	if val > 255 {
-		val = 255
-	}
-	return uint8(val + 0.5)
-}
-
-func toGray16(v float32) uint16 {
-	return uint16(clamp01(v) * 65535.0)
-}
-
-func encodeGainmapGray(img image.Image, gamma float32) image.Image {
-	b := img.Bounds()
-	out := image.NewGray(b)
-	for y := 0; y < b.Dy(); y++ {
-		for x := 0; x < b.Dx(); x++ {
-			c := color.Gray16Model.Convert(img.At(b.Min.X+x, b.Min.Y+y)).(color.Gray16)
-			g := float32(c.Y) / 65535.0
-			out.SetGray(x, y, color.Gray{Y: gainmapEncodeValue(g, gamma)})
-		}
-	}
-	return out
-}
-
-func encodeGainmapRGB(img image.Image, gamma [3]float32) image.Image {
-	b := img.Bounds()
-	out := image.NewRGBA(b)
-	for y := 0; y < b.Dy(); y++ {
-		for x := 0; x < b.Dx(); x++ {
-			c := color.RGBA64Model.Convert(img.At(b.Min.X+x, b.Min.Y+y)).(color.RGBA64)
-			r := float32(c.R) / 65535.0
-			g := float32(c.G) / 65535.0
-			bv := float32(c.B) / 65535.0
-			out.SetRGBA(x, y, color.RGBA{
-				R: gainmapEncodeValue(r, gamma[0]),
-				G: gainmapEncodeValue(g, gamma[1]),
-				B: gainmapEncodeValue(bv, gamma[2]),
-				A: 0xFF,
-			})
-		}
-	}
-	return out
 }
 
 func clamp01(v float32) float32 {

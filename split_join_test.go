@@ -250,7 +250,6 @@ func TestResizeParallelNoRace(t *testing.T) {
 	}
 
 	jpegData := sr.PrimaryJPEG
-	sr = nil
 
 	errCh := make(chan error, workers)
 	for i := 0; i < workers; i++ {
