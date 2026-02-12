@@ -94,7 +94,7 @@ func runResize(args []string) error {
 		case "lanczos3":
 			interpMode = ultrahdr.InterpolationLanczos3
 		}
-		opt.PrimaryInterpolation = interpMode
+		opt.Interpolation = interpMode
 	})
 }
 

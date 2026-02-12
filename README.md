@@ -67,7 +67,7 @@ go run ./cmd/uhdrtool detect -in testdata/uhdr.jpg
 Primary image interpolation is built in. Set `ResizeOptions.PrimaryInterpolation` to one of
 `InterpolationNearest`, `InterpolationBilinear`, `InterpolationBicubic`,
 `InterpolationMitchellNetravali`, `InterpolationLanczos2`, or `InterpolationLanczos3`. Gainmap
-resizing uses the same interpolation mode unless you provide a custom `Resize` function.
+resizing uses the same interpolation mode.
 
 ## Detection
 

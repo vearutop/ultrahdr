@@ -18,16 +18,13 @@ import (
 type ResizeOptions struct {
 	PrimaryQuality int
 	GainmapQuality int
-	// PrimaryInterpolation selects the built-in interpolation mode for the primary image
+	// Interpolation selects the built-in interpolation mode for the primary image and gainmap
 	// when Resize is nil.
-	PrimaryInterpolation Interpolation
-	// Resize lets callers provide a custom resize implementation for the primary image.
-	// Gainmap resizing always uses nearest-neighbor.
-	Resize     func(img image.Image, w, h uint) image.Image
-	OnResult   func(res *ResizeResult)
-	OnSplit    func(sr *SplitResult)
-	PrimaryOut string
-	GainmapOut string
+	Interpolation Interpolation
+	OnResult      func(res *ResizeResult)
+	OnSplit       func(sr *SplitResult)
+	PrimaryOut    string
+	GainmapOut    string
 }
 
 // ResizeResult contains the resized container and its component JPEGs.
@@ -52,9 +49,9 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 	}
 
 	opt := ResizeOptions{
-		PrimaryQuality:       85,
-		GainmapQuality:       75,
-		PrimaryInterpolation: InterpolationNearest,
+		PrimaryQuality: 85,
+		GainmapQuality: 75,
+		Interpolation:  InterpolationNearest,
 	}
 
 	for _, applyOpt := range opts {
@@ -65,12 +62,11 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 		opt.OnSplit(sr)
 	}
 
-	resize := opt.Resize
-	primaryThumb, err := resizeJPEG(sr.PrimaryJPEG, width, height, nil, opt.PrimaryQuality, resize, opt.PrimaryInterpolation)
+	primaryThumb, err := resizeJPEG(sr.PrimaryJPEG, width, height, nil, opt.PrimaryQuality, opt.Interpolation)
 	if err != nil {
 		return nil, fmt.Errorf("resize primary: %w", err)
 	}
-	gainmapThumb, err := resizeGainmapJPEG(sr.GainmapJPEG, width, height, nil, opt.GainmapQuality, sr.Meta, resize, opt.PrimaryInterpolation)
+	gainmapThumb, err := resizeGainmapJPEG(sr.GainmapJPEG, width, height, nil, opt.GainmapQuality, sr.Meta, opt.Interpolation)
 	if err != nil {
 		return nil, fmt.Errorf("resize gainmap: %w", err)
 	}
@@ -115,7 +111,7 @@ func ResizeJPEG(data []byte, width, height uint, quality int, interp Interpolati
 			segs = append(segs, appSegment{marker: markerAPP2, payload: seg})
 		}
 	}
-	return resizeJPEG(data, width, height, segs, quality, nil, interp)
+	return resizeJPEG(data, width, height, segs, quality, interp)
 }
 
 // ResizeUltraHDRFile reads an UltraHDR JPEG from inPath, resizes it, and writes
@@ -152,10 +148,6 @@ func ResizeUltraHDRFile(inPath, outPath string, width, height uint, opts ...func
 	return nil
 }
 
-// ResizeFunc lets callers provide a custom resize implementation.
-// The resizer is expected to preserve linear channel values.
-type ResizeFunc func(img image.Image, w, h uint) image.Image
-
 // Interpolation selects the built-in interpolation mode.
 type Interpolation int
 
@@ -174,36 +166,33 @@ const (
 	InterpolationLanczos3
 )
 
-func resizeJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, resize ResizeFunc, interp Interpolation) ([]byte, error) {
+func resizeJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, interp Interpolation) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(jpegData))
 	if err != nil {
 		return nil, err
 	}
 	var outImg image.Image
-	if resize != nil {
-		outImg = resize(img, w, h)
-	} else {
-		switch src := img.(type) {
-		case *image.YCbCr:
-			outImg = resizeYCbCrInterpolated(src, int(w), int(h), interp)
-		case *image.Gray:
-			outImg = resizeGrayInterpolated(src, int(w), int(h), interp)
-		case *image.Gray16:
-			outImg = resizeGray16Interpolated(src, int(w), int(h), interp)
-		case *image.RGBA:
-			outImg = resizeRGBAInterpolated(src, int(w), int(h), interp)
-		case *image.NRGBA:
-			outImg = resizeNRGBAInterpolated(src, int(w), int(h), interp)
-		case *image.RGBA64:
-			outImg = resizeRGBA64Interpolated(src, int(w), int(h), interp)
-		case *image.NRGBA64:
-			outImg = resizeNRGBA64Interpolated(src, int(w), int(h), interp)
-		default:
-			dst := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
-			nearestScale(dst, img)
-			outImg = dst
-		}
+	switch src := img.(type) {
+	case *image.YCbCr:
+		outImg = resizeYCbCrInterpolated(src, int(w), int(h), interp)
+	case *image.Gray:
+		outImg = resizeGrayInterpolated(src, int(w), int(h), interp)
+	case *image.Gray16:
+		outImg = resizeGray16Interpolated(src, int(w), int(h), interp)
+	case *image.RGBA:
+		outImg = resizeRGBAInterpolated(src, int(w), int(h), interp)
+	case *image.NRGBA:
+		outImg = resizeNRGBAInterpolated(src, int(w), int(h), interp)
+	case *image.RGBA64:
+		outImg = resizeRGBA64Interpolated(src, int(w), int(h), interp)
+	case *image.NRGBA64:
+		outImg = resizeNRGBA64Interpolated(src, int(w), int(h), interp)
+	default:
+		dst := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
+		nearestScale(dst, img)
+		outImg = dst
 	}
+
 	out, err := encodeWithQuality(outImg, quality)
 	if err != nil {
 		return nil, err
@@ -214,7 +203,7 @@ func resizeJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, resi
 	return out, nil
 }
 
-func resizeGainmapJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, meta *GainMapMetadata, resize ResizeFunc, interp Interpolation) ([]byte, error) {
+func resizeGainmapJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, meta *GainMapMetadata, interp Interpolation) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(jpegData))
 	if err != nil {
 		return nil, err
@@ -223,32 +212,25 @@ func resizeGainmapJPEG(jpegData []byte, w, h uint, segs []appSegment, quality in
 		return nil, errors.New("gainmap metadata missing")
 	}
 	var outImg image.Image
-	if resize != nil {
-		outImg, err = resizeGainmapLinear(img, w, h, meta, resize)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		switch src := img.(type) {
-		case *image.YCbCr:
-			outImg = resizeYCbCrInterpolated(src, int(w), int(h), interp)
-		case *image.Gray:
-			outImg = resizeGrayInterpolated(src, int(w), int(h), interp)
-		case *image.Gray16:
-			outImg = resizeGray16Interpolated(src, int(w), int(h), interp)
-		case *image.RGBA:
-			outImg = resizeRGBAInterpolated(src, int(w), int(h), interp)
-		case *image.NRGBA:
-			outImg = resizeNRGBAInterpolated(src, int(w), int(h), interp)
-		case *image.RGBA64:
-			outImg = resizeRGBA64Interpolated(src, int(w), int(h), interp)
-		case *image.NRGBA64:
-			outImg = resizeNRGBA64Interpolated(src, int(w), int(h), interp)
-		default:
-			dst := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
-			nearestScale(dst, img)
-			outImg = dst
-		}
+	switch src := img.(type) {
+	case *image.YCbCr:
+		outImg = resizeYCbCrInterpolated(src, int(w), int(h), interp)
+	case *image.Gray:
+		outImg = resizeGrayInterpolated(src, int(w), int(h), interp)
+	case *image.Gray16:
+		outImg = resizeGray16Interpolated(src, int(w), int(h), interp)
+	case *image.RGBA:
+		outImg = resizeRGBAInterpolated(src, int(w), int(h), interp)
+	case *image.NRGBA:
+		outImg = resizeNRGBAInterpolated(src, int(w), int(h), interp)
+	case *image.RGBA64:
+		outImg = resizeRGBA64Interpolated(src, int(w), int(h), interp)
+	case *image.NRGBA64:
+		outImg = resizeNRGBA64Interpolated(src, int(w), int(h), interp)
+	default:
+		dst := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
+		nearestScale(dst, img)
+		outImg = dst
 	}
 	out, err := encodeWithQuality(outImg, quality)
 	if err != nil {
@@ -332,42 +314,6 @@ func encodeWithQuality(img image.Image, quality int) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-func resizeGainmapLinear(img image.Image, w, h uint, meta *GainMapMetadata, resize ResizeFunc) (image.Image, error) {
-	if meta == nil {
-		return nil, errors.New("gainmap metadata missing")
-	}
-	isGray := isGrayImage(img)
-	if isGray {
-		linear := image.NewGray16(image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()))
-		for y := 0; y < linear.Rect.Dy(); y++ {
-			for x := 0; x < linear.Rect.Dx(); x++ {
-				g := gainmapDecodeValue(grayAt(img, x, y), meta.Gamma[0])
-				linear.SetGray16(x, y, color.Gray16{Y: toGray16(g)})
-			}
-		}
-		resized := resize(linear, w, h)
-		return encodeGainmapGray(resized, meta.Gamma[0]), nil
-	}
-
-	linear := image.NewRGBA64(image.Rect(0, 0, img.Bounds().Dx(), img.Bounds().Dy()))
-	for y := 0; y < linear.Rect.Dy(); y++ {
-		for x := 0; x < linear.Rect.Dx(); x++ {
-			r8, g8, b8 := rgbAt(img, x, y)
-			r := gainmapDecodeValue(r8, meta.Gamma[0])
-			g := gainmapDecodeValue(g8, meta.Gamma[1])
-			b := gainmapDecodeValue(b8, meta.Gamma[2])
-			linear.SetRGBA64(x, y, color.RGBA64{
-				R: toGray16(r),
-				G: toGray16(g),
-				B: toGray16(b),
-				A: 0xFFFF,
-			})
-		}
-	}
-	resized := resize(linear, w, h)
-	return encodeGainmapRGB(resized, meta.Gamma), nil
 }
 
 func gainmapDecodeValue(v uint8, gamma float32) float32 {

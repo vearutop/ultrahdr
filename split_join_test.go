@@ -37,7 +37,7 @@ func BenchmarkResize(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
 				_, err := ResizeUltraHDR(j, 600, 400, func(opts *ResizeOptions) {
-					opts.PrimaryInterpolation = bench.interp
+					opts.Interpolation = bench.interp
 				})
 				if err != nil {
 					b.Fatal(err)
@@ -172,7 +172,7 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 		2400,
 		1600,
 		func(opts *ResizeOptions) {
-			opts.PrimaryInterpolation = interp
+			opts.Interpolation = interp
 			opts.PrimaryOut = primary
 			opts.GainmapOut = gainmap
 		},
@@ -265,7 +265,7 @@ func TestResizeParallelNoRace(t *testing.T) {
 		t.Logf("%s warmup ResizeUltraHDR", time.Now().Format(time.RFC3339Nano))
 	}
 	if _, err := ResizeUltraHDR(data, uint(width), uint(height), func(opts *ResizeOptions) {
-		opts.PrimaryInterpolation = InterpolationBilinear
+		opts.Interpolation = InterpolationBilinear
 	}); err != nil {
 		t.Fatalf("resize ultrahdr warmup: %v", err)
 	}
@@ -280,11 +280,11 @@ func TestResizeParallelNoRace(t *testing.T) {
 				_, err := ResizeUltraHDR(data, uint(width), uint(height), func(opts *ResizeOptions) {
 					switch (idx + j) % 3 {
 					case 0:
-						opts.PrimaryInterpolation = InterpolationBilinear
+						opts.Interpolation = InterpolationBilinear
 					case 1:
-						opts.PrimaryInterpolation = InterpolationMitchellNetravali
+						opts.Interpolation = InterpolationMitchellNetravali
 					default:
-						opts.PrimaryInterpolation = InterpolationLanczos3
+						opts.Interpolation = InterpolationLanczos3
 					}
 				})
 				if err != nil {
