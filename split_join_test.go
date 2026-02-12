@@ -7,7 +7,41 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
+
+func BenchmarkResize(b *testing.B) {
+	j, err := os.ReadFile("testdata/small_uhdr.jpg")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	benches := []struct {
+		name   string
+		interp Interpolation
+	}{
+		{name: "nearest", interp: InterpolationNearest},
+		{name: "bilinear", interp: InterpolationBilinear},
+		{name: "bicubic", interp: InterpolationBicubic},
+		{name: "mitchell", interp: InterpolationMitchellNetravali},
+		{name: "lanczos2", interp: InterpolationLanczos2},
+		{name: "lanczos3", interp: InterpolationLanczos3},
+	}
+	for _, bench := range benches {
+		bench := bench
+		b.Run(bench.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				_, err := ResizeUltraHDR(j, 300, 200, func(opts *ResizeOptions) {
+					opts.Interpolation = bench.interp
+				})
+				if err != nil {
+					b.Fatal(err)
+				}
+			}
+		})
+	}
+}
 
 func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	var (
@@ -16,7 +50,7 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	)
 
 	// Use a known valid UltraHDR JPEG.
-	err := ResizeUltraHDRFile("testdata/uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
+	err := ResizeUltraHDRFile("testdata/small_uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
 		func(opts *ResizeOptions) {
 			opts.OnResult = func(res *ResizeResult) {
 				result = res
@@ -96,6 +130,168 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	}
 	if err := validateMpfEntries(result.Container, gotMpf); err != nil {
 		t.Fatalf("mpf output invalid: %v", err)
+	}
+}
+
+func TestResizeLanczos2WritesArtifacts(t *testing.T) {
+	writeResizeArtifacts(t, "lanczos2", InterpolationLanczos2)
+}
+
+func TestResizeNearestWritesArtifacts(t *testing.T) {
+	writeResizeArtifacts(t, "nearest", InterpolationNearest)
+}
+
+func TestResizeBilinearWritesArtifacts(t *testing.T) {
+	writeResizeArtifacts(t, "bilinear", InterpolationBilinear)
+}
+
+func TestResizeBicubicWritesArtifacts(t *testing.T) {
+	writeResizeArtifacts(t, "bicubic", InterpolationBicubic)
+}
+
+func TestResizeMitchellWritesArtifacts(t *testing.T) {
+	writeResizeArtifacts(t, "mitchell", InterpolationMitchellNetravali)
+}
+
+func TestResizeLanczos3WritesArtifacts(t *testing.T) {
+	writeResizeArtifacts(t, "lanczos3", InterpolationLanczos3)
+}
+
+func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
+	t.Helper()
+	container := "testdata/uhdr_thumb_" + name + ".jpg"
+	primary := "testdata/uhdr_thumb_" + name + "_primary.jpg"
+	gainmap := "testdata/uhdr_thumb_" + name + "_gainmap.jpg"
+	if err := ResizeUltraHDRFile(
+		"testdata/small_uhdr.jpg",
+		container,
+		300,
+		200,
+		func(opts *ResizeOptions) {
+			opts.Interpolation = interp
+			opts.PrimaryOut = primary
+			opts.GainmapOut = gainmap
+		},
+	); err != nil {
+		t.Fatalf("resize %s: %v", name, err)
+	}
+}
+
+func TestResizeJPEGKeepMeta(t *testing.T) {
+	data, err := os.ReadFile("testdata/small_uhdr.jpg")
+	if err != nil {
+		t.Fatalf("read uhdr: %v", err)
+	}
+	split, err := Split(data)
+	if err != nil {
+		t.Fatalf("split: %v", err)
+	}
+	exif, icc, err := extractExifAndIcc(split.PrimaryJPEG)
+	if err != nil {
+		t.Fatalf("extract exif/icc: %v", err)
+	}
+	if exif == nil && len(icc) == 0 {
+		t.Skip("primary jpeg has no exif/icc to verify")
+	}
+
+	noMeta, err := ResizeJPEG(split.PrimaryJPEG, 600, 400, 85, InterpolationBilinear, false)
+	if err != nil {
+		t.Fatalf("resize jpeg no meta: %v", err)
+	}
+	exifNo, iccNo, err := extractExifAndIcc(noMeta)
+	if err != nil {
+		t.Fatalf("extract exif/icc no meta: %v", err)
+	}
+	if exifNo != nil || len(iccNo) != 0 {
+		t.Fatalf("unexpected metadata preserved")
+	}
+
+	withMeta, err := ResizeJPEG(split.PrimaryJPEG, 600, 400, 85, InterpolationBilinear, true)
+	if err != nil {
+		t.Fatalf("resize jpeg keep meta: %v", err)
+	}
+	exifYes, iccYes, err := extractExifAndIcc(withMeta)
+	if err != nil {
+		t.Fatalf("extract exif/icc keep meta: %v", err)
+	}
+	if (exif == nil) != (exifYes == nil) || (exif != nil && !bytes.Equal(exif, exifYes)) {
+		t.Fatalf("exif mismatch")
+	}
+	if len(icc) != len(iccYes) {
+		t.Fatalf("icc segment count mismatch")
+	}
+	for i := range icc {
+		if !bytes.Equal(icc[i], iccYes[i]) {
+			t.Fatalf("icc segment mismatch")
+		}
+	}
+
+	if err := os.WriteFile("testdata/resizejpeg_bilinear.jpg", noMeta, 0o644); err != nil {
+		t.Fatalf("write resizejpeg_bilinear.jpg: %v", err)
+	}
+	if err := os.WriteFile("testdata/resizejpeg_bilinear_keepmeta.jpg", withMeta, 0o644); err != nil {
+		t.Fatalf("write resizejpeg_bilinear_keepmeta.jpg: %v", err)
+	}
+}
+
+func TestResizeParallelNoRace(t *testing.T) {
+	data, err := os.ReadFile("testdata/small_uhdr.jpg")
+	if err != nil {
+		t.Fatalf("read uhdr: %v", err)
+	}
+
+	workers := 4
+	iterations := 3
+	width, height := 300, 200
+
+	sr, err := Split(data)
+	if err != nil {
+		t.Fatalf("split: %v", err)
+	}
+
+	jpegData := sr.PrimaryJPEG
+
+	errCh := make(chan error, workers)
+	for i := 0; i < workers; i++ {
+		go func(idx int) {
+			for j := 0; j < iterations; j++ {
+				if testing.Verbose() {
+					t.Logf("%s worker=%d iter=%d", time.Now().Format(time.RFC3339Nano), idx, j)
+				}
+				start := time.Now()
+				_, err := ResizeUltraHDR(data, uint(width), uint(height), func(opts *ResizeOptions) {
+					switch (idx + j) % 3 {
+					case 0:
+						opts.Interpolation = InterpolationBilinear
+					case 1:
+						opts.Interpolation = InterpolationMitchellNetravali
+					default:
+						opts.Interpolation = InterpolationLanczos3
+					}
+				})
+				if err != nil {
+					errCh <- err
+					return
+				}
+				if testing.Verbose() {
+					t.Logf("%s worker=%d iter=%d ResizeUltraHDR=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
+				}
+				start = time.Now()
+				if _, err := ResizeJPEG(jpegData, uint(width), uint(height), 85, InterpolationLanczos2, false); err != nil {
+					errCh <- err
+					return
+				}
+				if testing.Verbose() {
+					t.Logf("%s worker=%d iter=%d ResizeJPEG=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
+				}
+			}
+			errCh <- nil
+		}(i)
+	}
+	for i := 0; i < workers; i++ {
+		if err := <-errCh; err != nil {
+			t.Fatalf("resize parallel: %v", err)
+		}
 	}
 }
 

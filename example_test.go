@@ -40,3 +40,11 @@ func ExampleResizeUltraHDR() {
 	}
 	_, _ = ultrahdr.ResizeUltraHDR(data, 2400, 1600)
 }
+
+func ExampleResizeJPEG() {
+	data, err := os.ReadFile(filepath.FromSlash("testdata/uhdr_thumb_nearest_primary.jpg"))
+	if err != nil {
+		return
+	}
+	_, _ = ultrahdr.ResizeJPEG(data, 800, 600, 85, ultrahdr.InterpolationLanczos2, true)
+}
