@@ -62,11 +62,12 @@ go run ./cmd/uhdrtool rebase -in testdata/uhdr.jpg -primary better_sdr.jpg -out 
 go run ./cmd/uhdrtool detect -in testdata/uhdr.jpg
 ```
 
-## Custom Resizer
+## Resizing
 
-You can plug in a custom resizer (e.g. `github.com/nfnt/resize`) via `ResizeOptions.Resizer`.
-The resizer is used for both base and gainmap. Gainmap resizing is performed in linear gain
-space and then re-encoded to preserve HDR correctness.
+Primary image interpolation is built in. Set `ResizeOptions.PrimaryInterpolation` to one of
+`InterpolationNearest`, `InterpolationBilinear`, `InterpolationBicubic`,
+`InterpolationMitchellNetravali`, `InterpolationLanczos2`, or `InterpolationLanczos3`. Gainmap
+resizing uses the same interpolation mode unless you provide a custom `Resize` function.
 
 ## Detection
 
@@ -81,6 +82,20 @@ ok, err := ultrahdr.IsUltraHDR(f)
 // ok == true means the file looks like a valid UltraHDR JPEG/R container.
 ```
 
+## ResizeJPEG (SDR)
+
+```go
+data, err := os.ReadFile("input.jpg")
+if err != nil {
+	// handle error
+}
+resized, err := ultrahdr.ResizeJPEG(data, 1600, 1200, 85, ultrahdr.InterpolationLanczos2, true)
+if err != nil {
+	// handle error
+}
+_ = os.WriteFile("output.jpg", resized, 0o644)
+```
+
 ## Limitations
 
 - SDR base image is assumed to be sRGB.
@@ -88,3 +103,4 @@ ok, err := ultrahdr.IsUltraHDR(f)
 - No gamut conversion or transfer function conversion.
 - Gain map sampling uses nearest-neighbor.
 - Only XMP + ISO 21496-1 gain map metadata are generated.
+- `ResizeJPEG` metadata preservation is limited to EXIF and ICC segments (XMP is not preserved).
