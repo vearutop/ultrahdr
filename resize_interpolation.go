@@ -3,7 +3,6 @@ package ultrahdr
 import (
 	"image"
 	"math"
-	"runtime"
 	"sync"
 )
 
@@ -33,12 +32,6 @@ var float32Pool = sync.Pool{
 		return &buf
 	},
 }
-
-var (
-	maxParallelWorkers = 0
-	workerSemOnce      sync.Once
-	workerSem          chan struct{}
-)
 
 func kernelForInterpolation(interp Interpolation) kernelDef {
 	switch interp {
@@ -169,49 +162,45 @@ func resamplePlane8(src []uint8, srcW, srcH, srcStride, dstW, dstH int, def kern
 	wy := getWeights(srcH, dstH, def, scaleY)
 
 	temp := getFloat32(dstW * srcH)
-	parallelFor(srcH, func(start, end int) {
-		for y := start; y < end; y++ {
-			row := src[y*srcStride:]
-			outRow := temp[y*dstW:]
-			for x := 0; x < dstW; x++ {
-				s := wx.start[x]
-				base := x * wx.filterLength
-				var sum float32
-				for i := 0; i < wx.filterLength; i++ {
-					xi := s + i
-					if xi < 0 {
-						xi = 0
-					} else if xi >= srcW {
-						xi = srcW - 1
-					}
-					sum += float32(row[xi]) * wx.coeffs[base+i]
+	for y := 0; y < srcH; y++ {
+		row := src[y*srcStride:]
+		outRow := temp[y*dstW:]
+		for x := 0; x < dstW; x++ {
+			s := wx.start[x]
+			base := x * wx.filterLength
+			var sum float32
+			for i := 0; i < wx.filterLength; i++ {
+				xi := s + i
+				if xi < 0 {
+					xi = 0
+				} else if xi >= srcW {
+					xi = srcW - 1
 				}
-				outRow[x] = sum
+				sum += float32(row[xi]) * wx.coeffs[base+i]
 			}
+			outRow[x] = sum
 		}
-	})
+	}
 
 	out := make([]uint8, dstW*dstH)
-	parallelFor(dstH, func(start, end int) {
-		for y := start; y < end; y++ {
-			s := wy.start[y]
-			base := y * wy.filterLength
-			row := out[y*dstW:]
-			for x := 0; x < dstW; x++ {
-				var sum float32
-				for i := 0; i < wy.filterLength; i++ {
-					yi := s + i
-					if yi < 0 {
-						yi = 0
-					} else if yi >= srcH {
-						yi = srcH - 1
-					}
-					sum += temp[yi*dstW+x] * wy.coeffs[base+i]
+	for y := 0; y < dstH; y++ {
+		s := wy.start[y]
+		base := y * wy.filterLength
+		row := out[y*dstW:]
+		for x := 0; x < dstW; x++ {
+			var sum float32
+			for i := 0; i < wy.filterLength; i++ {
+				yi := s + i
+				if yi < 0 {
+					yi = 0
+				} else if yi >= srcH {
+					yi = srcH - 1
 				}
-				row[x] = clampToByte(sum)
+				sum += temp[yi*dstW+x] * wy.coeffs[base+i]
 			}
+			row[x] = clampToByte(sum)
 		}
-	})
+	}
 
 	putFloat32(temp)
 	return out
@@ -224,51 +213,47 @@ func resamplePlane16(src []uint8, srcW, srcH, srcStride, dstW, dstH int, def ker
 	wy := getWeights(srcH, dstH, def, scaleY)
 
 	temp := getFloat32(dstW * srcH)
-	parallelFor(srcH, func(start, end int) {
-		for y := start; y < end; y++ {
-			row := src[y*srcStride:]
-			outRow := temp[y*dstW:]
-			for x := 0; x < dstW; x++ {
-				s := wx.start[x]
-				base := x * wx.filterLength
-				var sum float32
-				for i := 0; i < wx.filterLength; i++ {
-					xi := s + i
-					if xi < 0 {
-						xi = 0
-					} else if xi >= srcW {
-						xi = srcW - 1
-					}
-					off := xi * 2
-					val := uint16(row[off])<<8 | uint16(row[off+1])
-					sum += float32(val) * wx.coeffs[base+i]
+	for y := 0; y < srcH; y++ {
+		row := src[y*srcStride:]
+		outRow := temp[y*dstW:]
+		for x := 0; x < dstW; x++ {
+			s := wx.start[x]
+			base := x * wx.filterLength
+			var sum float32
+			for i := 0; i < wx.filterLength; i++ {
+				xi := s + i
+				if xi < 0 {
+					xi = 0
+				} else if xi >= srcW {
+					xi = srcW - 1
 				}
-				outRow[x] = sum
+				off := xi * 2
+				val := uint16(row[off])<<8 | uint16(row[off+1])
+				sum += float32(val) * wx.coeffs[base+i]
 			}
+			outRow[x] = sum
 		}
-	})
+	}
 
 	out := make([]uint16, dstW*dstH)
-	parallelFor(dstH, func(start, end int) {
-		for y := start; y < end; y++ {
-			s := wy.start[y]
-			base := y * wy.filterLength
-			row := out[y*dstW:]
-			for x := 0; x < dstW; x++ {
-				var sum float32
-				for i := 0; i < wy.filterLength; i++ {
-					yi := s + i
-					if yi < 0 {
-						yi = 0
-					} else if yi >= srcH {
-						yi = srcH - 1
-					}
-					sum += temp[yi*dstW+x] * wy.coeffs[base+i]
+	for y := 0; y < dstH; y++ {
+		s := wy.start[y]
+		base := y * wy.filterLength
+		row := out[y*dstW:]
+		for x := 0; x < dstW; x++ {
+			var sum float32
+			for i := 0; i < wy.filterLength; i++ {
+				yi := s + i
+				if yi < 0 {
+					yi = 0
+				} else if yi >= srcH {
+					yi = srcH - 1
 				}
-				row[x] = clampToUint16(sum)
+				sum += temp[yi*dstW+x] * wy.coeffs[base+i]
 			}
+			row[x] = clampToUint16(sum)
 		}
-	})
+	}
 
 	putFloat32(temp)
 	return out
@@ -281,67 +266,63 @@ func resampleRGBA8(src []uint8, srcW, srcH, srcStride, dstW, dstH int, def kerne
 	wy := getWeights(srcH, dstH, def, scaleY)
 
 	temp := getFloat32(dstW * srcH * 4)
-	parallelFor(srcH, func(start, end int) {
-		for y := start; y < end; y++ {
-			row := src[y*srcStride:]
-			outRow := temp[y*dstW*4:]
-			for x := 0; x < dstW; x++ {
-				s := wx.start[x]
-				base := x * wx.filterLength
-				var r, g, b, a float32
-				for i := 0; i < wx.filterLength; i++ {
-					xi := s + i
-					if xi < 0 {
-						xi = 0
-					} else if xi >= srcW {
-						xi = srcW - 1
-					}
-					off := xi * 4
-					w := wx.coeffs[base+i]
-					r += float32(row[off+0]) * w
-					g += float32(row[off+1]) * w
-					b += float32(row[off+2]) * w
-					a += float32(row[off+3]) * w
+	for y := 0; y < srcH; y++ {
+		row := src[y*srcStride:]
+		outRow := temp[y*dstW*4:]
+		for x := 0; x < dstW; x++ {
+			s := wx.start[x]
+			base := x * wx.filterLength
+			var r, g, b, a float32
+			for i := 0; i < wx.filterLength; i++ {
+				xi := s + i
+				if xi < 0 {
+					xi = 0
+				} else if xi >= srcW {
+					xi = srcW - 1
 				}
-				outOff := x * 4
-				outRow[outOff+0] = r
-				outRow[outOff+1] = g
-				outRow[outOff+2] = b
-				outRow[outOff+3] = a
+				off := xi * 4
+				w := wx.coeffs[base+i]
+				r += float32(row[off+0]) * w
+				g += float32(row[off+1]) * w
+				b += float32(row[off+2]) * w
+				a += float32(row[off+3]) * w
 			}
+			outOff := x * 4
+			outRow[outOff+0] = r
+			outRow[outOff+1] = g
+			outRow[outOff+2] = b
+			outRow[outOff+3] = a
 		}
-	})
+	}
 
 	out := make([]uint8, dstW*dstH*4)
-	parallelFor(dstH, func(start, end int) {
-		for y := start; y < end; y++ {
-			s := wy.start[y]
-			base := y * wy.filterLength
-			row := out[y*dstW*4:]
-			for x := 0; x < dstW; x++ {
-				var r, g, b, a float32
-				for i := 0; i < wy.filterLength; i++ {
-					yi := s + i
-					if yi < 0 {
-						yi = 0
-					} else if yi >= srcH {
-						yi = srcH - 1
-					}
-					off := (yi*dstW + x) * 4
-					w := wy.coeffs[base+i]
-					r += temp[off+0] * w
-					g += temp[off+1] * w
-					b += temp[off+2] * w
-					a += temp[off+3] * w
+	for y := 0; y < dstH; y++ {
+		s := wy.start[y]
+		base := y * wy.filterLength
+		row := out[y*dstW*4:]
+		for x := 0; x < dstW; x++ {
+			var r, g, b, a float32
+			for i := 0; i < wy.filterLength; i++ {
+				yi := s + i
+				if yi < 0 {
+					yi = 0
+				} else if yi >= srcH {
+					yi = srcH - 1
 				}
-				outOff := x * 4
-				row[outOff+0] = clampToByte(r)
-				row[outOff+1] = clampToByte(g)
-				row[outOff+2] = clampToByte(b)
-				row[outOff+3] = clampToByte(a)
+				off := (yi*dstW + x) * 4
+				w := wy.coeffs[base+i]
+				r += temp[off+0] * w
+				g += temp[off+1] * w
+				b += temp[off+2] * w
+				a += temp[off+3] * w
 			}
+			outOff := x * 4
+			row[outOff+0] = clampToByte(r)
+			row[outOff+1] = clampToByte(g)
+			row[outOff+2] = clampToByte(b)
+			row[outOff+3] = clampToByte(a)
 		}
-	})
+	}
 
 	putFloat32(temp)
 	return out
@@ -354,67 +335,63 @@ func resampleRGBA16(src []uint8, srcW, srcH, srcStride, dstW, dstH int, def kern
 	wy := getWeights(srcH, dstH, def, scaleY)
 
 	temp := getFloat32(dstW * srcH * 4)
-	parallelFor(srcH, func(start, end int) {
-		for y := start; y < end; y++ {
-			row := src[y*srcStride:]
-			outRow := temp[y*dstW*4:]
-			for x := 0; x < dstW; x++ {
-				s := wx.start[x]
-				base := x * wx.filterLength
-				var r, g, b, a float32
-				for i := 0; i < wx.filterLength; i++ {
-					xi := s + i
-					if xi < 0 {
-						xi = 0
-					} else if xi >= srcW {
-						xi = srcW - 1
-					}
-					off := xi * 8
-					w := wx.coeffs[base+i]
-					r += float32(uint16(row[off+0])<<8|uint16(row[off+1])) * w
-					g += float32(uint16(row[off+2])<<8|uint16(row[off+3])) * w
-					b += float32(uint16(row[off+4])<<8|uint16(row[off+5])) * w
-					a += float32(uint16(row[off+6])<<8|uint16(row[off+7])) * w
+	for y := 0; y < srcH; y++ {
+		row := src[y*srcStride:]
+		outRow := temp[y*dstW*4:]
+		for x := 0; x < dstW; x++ {
+			s := wx.start[x]
+			base := x * wx.filterLength
+			var r, g, b, a float32
+			for i := 0; i < wx.filterLength; i++ {
+				xi := s + i
+				if xi < 0 {
+					xi = 0
+				} else if xi >= srcW {
+					xi = srcW - 1
 				}
-				outOff := x * 4
-				outRow[outOff+0] = r
-				outRow[outOff+1] = g
-				outRow[outOff+2] = b
-				outRow[outOff+3] = a
+				off := xi * 8
+				w := wx.coeffs[base+i]
+				r += float32(uint16(row[off+0])<<8|uint16(row[off+1])) * w
+				g += float32(uint16(row[off+2])<<8|uint16(row[off+3])) * w
+				b += float32(uint16(row[off+4])<<8|uint16(row[off+5])) * w
+				a += float32(uint16(row[off+6])<<8|uint16(row[off+7])) * w
 			}
+			outOff := x * 4
+			outRow[outOff+0] = r
+			outRow[outOff+1] = g
+			outRow[outOff+2] = b
+			outRow[outOff+3] = a
 		}
-	})
+	}
 
 	out := make([]uint16, dstW*dstH*4)
-	parallelFor(dstH, func(start, end int) {
-		for y := start; y < end; y++ {
-			s := wy.start[y]
-			base := y * wy.filterLength
-			row := out[y*dstW*4:]
-			for x := 0; x < dstW; x++ {
-				var r, g, b, a float32
-				for i := 0; i < wy.filterLength; i++ {
-					yi := s + i
-					if yi < 0 {
-						yi = 0
-					} else if yi >= srcH {
-						yi = srcH - 1
-					}
-					off := (yi*dstW + x) * 4
-					w := wy.coeffs[base+i]
-					r += temp[off+0] * w
-					g += temp[off+1] * w
-					b += temp[off+2] * w
-					a += temp[off+3] * w
+	for y := 0; y < dstH; y++ {
+		s := wy.start[y]
+		base := y * wy.filterLength
+		row := out[y*dstW*4:]
+		for x := 0; x < dstW; x++ {
+			var r, g, b, a float32
+			for i := 0; i < wy.filterLength; i++ {
+				yi := s + i
+				if yi < 0 {
+					yi = 0
+				} else if yi >= srcH {
+					yi = srcH - 1
 				}
-				outOff := x * 4
-				row[outOff+0] = clampToUint16(r)
-				row[outOff+1] = clampToUint16(g)
-				row[outOff+2] = clampToUint16(b)
-				row[outOff+3] = clampToUint16(a)
+				off := (yi*dstW + x) * 4
+				w := wy.coeffs[base+i]
+				r += temp[off+0] * w
+				g += temp[off+1] * w
+				b += temp[off+2] * w
+				a += temp[off+3] * w
 			}
+			outOff := x * 4
+			row[outOff+0] = clampToUint16(r)
+			row[outOff+1] = clampToUint16(g)
+			row[outOff+2] = clampToUint16(b)
+			row[outOff+3] = clampToUint16(a)
 		}
-	})
+	}
 
 	putFloat32(temp)
 	return out
@@ -454,59 +431,6 @@ func getWeights(src, dst int, def kernelDef, scale float64) resampleWeights {
 	weights := resampleWeights{coeffs: coeffs, start: start, filterLength: filterLength}
 	weightsCache.Store(key, weights)
 	return weights
-}
-
-func parallelFor(total int, fn func(start, end int)) {
-	if total <= 0 {
-		return
-	}
-	capacity := runtime.GOMAXPROCS(0)
-	if maxParallelWorkers > 0 && capacity > maxParallelWorkers {
-		capacity = maxParallelWorkers
-	}
-	if capacity < 1 {
-		capacity = 1
-	}
-	workerSemOnce.Do(func() {
-		workerSem = make(chan struct{}, capacity)
-	})
-	if cap(workerSem) < capacity {
-		capacity = cap(workerSem)
-		if capacity < 1 {
-			capacity = 1
-		}
-	}
-	workers := capacity
-	if maxParallelWorkers > 0 && workers > maxParallelWorkers {
-		workers = maxParallelWorkers
-	}
-	if workers > total {
-		workers = total
-	}
-	if workers <= 1 {
-		fn(0, total)
-		return
-	}
-	step := (total + workers - 1) / workers
-	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
-		start := i * step
-		end := start + step
-		if end > total {
-			end = total
-		}
-		if start >= end {
-			break
-		}
-		workerSem <- struct{}{}
-		wg.Add(1)
-		go func(s, e int) {
-			defer wg.Done()
-			defer func() { <-workerSem }()
-			fn(s, e)
-		}(start, end)
-	}
-	wg.Wait()
 }
 
 func getFloat32(n int) []float32 {
