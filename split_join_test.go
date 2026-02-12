@@ -9,7 +9,6 @@ import (
 	"image/jpeg"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 	"time"
 )
@@ -239,36 +238,23 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 }
 
 func TestResizeParallelNoRace(t *testing.T) {
-	data, err := os.ReadFile("testdata/uhdr.jpg")
+	data, err := os.ReadFile("testdata/small_uhdr.jpg")
 	if err != nil {
 		t.Fatalf("read uhdr: %v", err)
 	}
-	split, err := Split(data)
+
+	workers := 4
+	iterations := 10
+	width, height := 64, 64
+
+	sr, err := Split(data)
 	if err != nil {
 		t.Fatalf("split: %v", err)
 	}
-	primary := split.PrimaryJPEG
 
-	workers := runtime.GOMAXPROCS(0)
-	if workers < 2 {
-		workers = 2
-	}
-	if workers > 4 {
-		workers = 4
-	}
-	iterations := 1
-	width, height := 64, 64
-	jpegData := primary
-	jpegData = makeTinyJPEG()
+	jpegData := sr.PrimaryJPEG
+	sr = nil
 
-	if testing.Verbose() {
-		t.Logf("%s warmup ResizeUltraHDR", time.Now().Format(time.RFC3339Nano))
-	}
-	if _, err := ResizeUltraHDR(data, uint(width), uint(height), func(opts *ResizeOptions) {
-		opts.Interpolation = InterpolationBilinear
-	}); err != nil {
-		t.Fatalf("resize ultrahdr warmup: %v", err)
-	}
 	errCh := make(chan error, workers)
 	for i := 0; i < workers; i++ {
 		go func(idx int) {

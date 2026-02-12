@@ -34,9 +34,11 @@ var float32Pool = sync.Pool{
 	},
 }
 
-var maxParallelWorkers = 0
-var workerSemOnce sync.Once
-var workerSem chan struct{}
+var (
+	maxParallelWorkers = 0
+	workerSemOnce      sync.Once
+	workerSem          chan struct{}
+)
 
 func kernelForInterpolation(interp Interpolation) kernelDef {
 	switch interp {
