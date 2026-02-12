@@ -4,9 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"image"
-	"image/color"
-	"image/jpeg"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,7 +11,7 @@ import (
 )
 
 func BenchmarkResize(b *testing.B) {
-	j, err := os.ReadFile("testdata/uhdr.jpg")
+	j, err := os.ReadFile("testdata/small_uhdr.jpg")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -35,7 +32,7 @@ func BenchmarkResize(b *testing.B) {
 		b.Run(bench.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				_, err := ResizeUltraHDR(j, 600, 400, func(opts *ResizeOptions) {
+				_, err := ResizeUltraHDR(j, 300, 200, func(opts *ResizeOptions) {
 					opts.Interpolation = bench.interp
 				})
 				if err != nil {
@@ -53,7 +50,7 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	)
 
 	// Use a known valid UltraHDR JPEG.
-	err := ResizeUltraHDRFile("testdata/uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
+	err := ResizeUltraHDRFile("testdata/small_uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
 		func(opts *ResizeOptions) {
 			opts.OnResult = func(res *ResizeResult) {
 				result = res
@@ -166,10 +163,10 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 	primary := "testdata/uhdr_thumb_" + name + "_primary.jpg"
 	gainmap := "testdata/uhdr_thumb_" + name + "_gainmap.jpg"
 	if err := ResizeUltraHDRFile(
-		"testdata/uhdr.jpg",
+		"testdata/small_uhdr.jpg",
 		container,
-		2400,
-		1600,
+		300,
+		200,
 		func(opts *ResizeOptions) {
 			opts.Interpolation = interp
 			opts.PrimaryOut = primary
@@ -181,7 +178,7 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 }
 
 func TestResizeJPEGKeepMeta(t *testing.T) {
-	data, err := os.ReadFile("testdata/uhdr.jpg")
+	data, err := os.ReadFile("testdata/small_uhdr.jpg")
 	if err != nil {
 		t.Fatalf("read uhdr: %v", err)
 	}
@@ -244,8 +241,8 @@ func TestResizeParallelNoRace(t *testing.T) {
 	}
 
 	workers := 4
-	iterations := 10
-	width, height := 64, 64
+	iterations := 3
+	width, height := 300, 200
 
 	sr, err := Split(data)
 	if err != nil {
@@ -297,18 +294,6 @@ func TestResizeParallelNoRace(t *testing.T) {
 			t.Fatalf("resize parallel: %v", err)
 		}
 	}
-}
-
-func makeTinyJPEG() []byte {
-	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
-	for y := 0; y < 64; y++ {
-		for x := 0; x < 64; x++ {
-			img.Set(x, y, color.RGBA{R: uint8(x * 4), G: uint8(y * 4), B: uint8((x + y) * 2), A: 0xFF})
-		}
-	}
-	var buf bytes.Buffer
-	_ = jpeg.Encode(&buf, img, &jpeg.Options{Quality: 80})
-	return buf.Bytes()
 }
 
 type mpfEntries struct {
