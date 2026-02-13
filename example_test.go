@@ -42,9 +42,27 @@ func ExampleResizeUltraHDR() {
 }
 
 func ExampleResizeJPEG() {
-	data, err := os.ReadFile(filepath.FromSlash("testdata/uhdr_thumb_nearest_primary.jpg"))
+	data, err := os.ReadFile(filepath.FromSlash("testdata/sample_srgb.jpg"))
 	if err != nil {
 		return
 	}
 	_, _ = ultrahdr.ResizeJPEG(data, 800, 600, 85, ultrahdr.InterpolationLanczos2, true)
+}
+
+func ExampleResizeJPEGBatch() {
+	data, err := os.ReadFile(filepath.FromSlash("testdata/sample_display_p3.jpg"))
+	if err != nil {
+		return
+	}
+	specs := []ultrahdr.ResizeJPEGSpec{
+		{Name: "large", Width: 1200, Height: 800, Quality: 85, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: true},
+		{Name: "medium", Width: 600, Height: 400, Quality: 82, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false},
+		{Name: "small", Width: 300, Height: 200, Quality: 78, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false},
+	}
+	outs, err := ultrahdr.ResizeJPEGBatch(data, specs)
+	if err != nil {
+		return
+	}
+	_ = outs[0].Spec.Name
+	_ = outs[0].Data
 }

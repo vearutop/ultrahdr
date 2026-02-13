@@ -59,13 +59,14 @@ func RebaseUltraHDRWithICCProfile(data []byte, newSDR image.Image, newSDRICCProf
 		return nil, err
 	}
 	oldICCProfile := collectICCProfile(oldICCSegs)
-	workGamut := detectGamutFromICCProfile(oldICCProfile)
-	newGamut := workGamut
+	oldProfile := detectColorProfileFromICCProfile(oldICCProfile)
+	workGamut := oldProfile.gamut
+	newProfile := oldProfile
 	if len(newSDRICCProfile) > 0 {
-		newGamut = detectGamutFromICCProfile(newSDRICCProfile)
+		newProfile = detectColorProfileFromICCProfile(newSDRICCProfile)
 	}
 
-	gainmapOut, err := rebaseGainmap(oldSDR, newSDR, gainmapImg, split.Meta, workGamut, newGamut)
+	gainmapOut, err := rebaseGainmap(oldSDR, newSDR, gainmapImg, split.Meta, oldProfile, newProfile, workGamut)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +157,7 @@ func RebaseUltraHDRFile(inPath, newSDRPath, outPath string, opt *RebaseOptions, 
 	return nil
 }
 
-func rebaseGainmap(oldSDR, newSDR, gainmap image.Image, meta *GainMapMetadata, oldGamut, newGamut colorGamut) (image.Image, error) {
+func rebaseGainmap(oldSDR, newSDR, gainmap image.Image, meta *GainMapMetadata, oldProfile, newProfile colorProfile, workGamut colorGamut) (image.Image, error) {
 	if meta == nil {
 		return nil, errors.New("gainmap metadata missing")
 	}
@@ -172,8 +173,8 @@ func rebaseGainmap(oldSDR, newSDR, gainmap image.Image, meta *GainMapMetadata, o
 		out := image.NewGray(image.Rect(0, 0, w, h))
 		for y := 0; y < h; y++ {
 			for x := 0; x < w; x++ {
-				oldRGB := sampleSDRInGamut(oldSDR, b.Min.X+x, b.Min.Y+y, oldGamut, oldGamut)
-				newRGB := sampleSDRInGamut(newSDR, b.Min.X+x, b.Min.Y+y, newGamut, oldGamut)
+				oldRGB := sampleSDRInProfile(oldSDR, b.Min.X+x, b.Min.Y+y, oldProfile, workGamut)
+				newRGB := sampleSDRInProfile(newSDR, b.Min.X+x, b.Min.Y+y, newProfile, workGamut)
 				gx := int(float32(x)/mapScaleX + 0.5)
 				gy := int(float32(y)/mapScaleY + 0.5)
 				if gx < 0 {
@@ -213,8 +214,8 @@ func rebaseGainmap(oldSDR, newSDR, gainmap image.Image, meta *GainMapMetadata, o
 	out := image.NewRGBA(image.Rect(0, 0, w, h))
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
-			oldRGB := sampleSDRInGamut(oldSDR, b.Min.X+x, b.Min.Y+y, oldGamut, oldGamut)
-			newRGB := sampleSDRInGamut(newSDR, b.Min.X+x, b.Min.Y+y, newGamut, oldGamut)
+			oldRGB := sampleSDRInProfile(oldSDR, b.Min.X+x, b.Min.Y+y, oldProfile, workGamut)
+			newRGB := sampleSDRInProfile(newSDR, b.Min.X+x, b.Min.Y+y, newProfile, workGamut)
 			gx := int(float32(x)/mapScaleX + 0.5)
 			gy := int(float32(y)/mapScaleY + 0.5)
 			if gx < 0 {
