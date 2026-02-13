@@ -124,6 +124,10 @@ if err != nil {
 _ = os.WriteFile("output.jpg", resized, 0o644)
 ```
 
+`ResizeJPEG` behavior:
+- `keepMeta=true`: preserves EXIF/ICC (including Display P3 profile).
+- `keepMeta=false`: strips metadata and converts Display P3 input to sRGB pixels for web-safe output.
+
 ## Limitations
 
 - SDR base image is assumed to be sRGB.
