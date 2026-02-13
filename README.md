@@ -86,6 +86,16 @@ Primary image interpolation is built in. Set `ResizeOptions.PrimaryInterpolation
 `InterpolationMitchellNetravali`, `InterpolationLanczos2`, or `InterpolationLanczos3`. Gainmap
 resizing uses the same interpolation mode.
 
+## Compatibility
+
+- Google Pixel UltraHDR JPEG/R files that store gainmap metadata in XMP only (no secondary ISO
+  APP2) are supported. Resize/rebase regenerates ISO 21496-1 metadata for the gainmap JPEG to
+  preserve HDR rendering in Chrome.
+- Older Adobe Camera Raw UltraHDR files are supported when gainmap XMP values are encoded as
+  `rdf:Seq` (`<rdf:li>...`) entries instead of attribute values.
+- Containers with embedded JPEG thumbnails are handled using MPF image ranges, so split/resize
+  targets the correct primary and gainmap images.
+
 ## Detection
 
 ```go

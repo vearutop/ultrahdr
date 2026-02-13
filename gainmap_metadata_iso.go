@@ -229,10 +229,7 @@ func (m *gainmapMetadataFrac) encode() ([]byte, error) {
 	}
 
 	denom := m.BaseHdrHeadroomD
-	useCommon := true
-	if m.BaseHdrHeadroomD != denom || m.AltHdrHeadroomD != denom {
-		useCommon = false
-	}
+	useCommon := m.AltHdrHeadroomD == denom
 	for c := 0; c < int(channelCount); c++ {
 		if m.GainMapMinD[c] != denom || m.GainMapMaxD[c] != denom || m.GainMapGammaD[c] != denom ||
 			m.BaseOffsetD[c] != denom || m.AltOffsetD[c] != denom {
@@ -377,16 +374,16 @@ func metaAllChannelsIdentical(m *GainMapMetadata) bool {
 }
 
 func (m *gainmapMetadataFrac) allChannelsIdentical() bool {
-	return m.GainMapMinN[0] == m.GainMapMinN[1] && m.GainMapMinN[0] == m.GainMapMinN[2] &&
-		m.GainMapMinD[0] == m.GainMapMinD[1] && m.GainMapMinD[0] == m.GainMapMinD[2] &&
-		m.GainMapMaxN[0] == m.GainMapMaxN[1] && m.GainMapMaxN[0] == m.GainMapMaxN[2] &&
-		m.GainMapMaxD[0] == m.GainMapMaxD[1] && m.GainMapMaxD[0] == m.GainMapMaxD[2] &&
-		m.GainMapGammaN[0] == m.GainMapGammaN[1] && m.GainMapGammaN[0] == m.GainMapGammaN[2] &&
-		m.GainMapGammaD[0] == m.GainMapGammaD[1] && m.GainMapGammaD[0] == m.GainMapGammaD[2] &&
-		m.BaseOffsetN[0] == m.BaseOffsetN[1] && m.BaseOffsetN[0] == m.BaseOffsetN[2] &&
-		m.BaseOffsetD[0] == m.BaseOffsetD[1] && m.BaseOffsetD[0] == m.BaseOffsetD[2] &&
-		m.AltOffsetN[0] == m.AltOffsetN[1] && m.AltOffsetN[0] == m.AltOffsetN[2] &&
-		m.AltOffsetD[0] == m.AltOffsetD[1] && m.AltOffsetD[0] == m.AltOffsetD[2]
+	return m.GainMapMinN[0] == m.GainMapMinN[1] && m.GainMapMinN[1] == m.GainMapMinN[2] &&
+		m.GainMapMinD[0] == m.GainMapMinD[1] && m.GainMapMinD[1] == m.GainMapMinD[2] &&
+		m.GainMapMaxN[0] == m.GainMapMaxN[1] && m.GainMapMaxN[1] == m.GainMapMaxN[2] &&
+		m.GainMapMaxD[0] == m.GainMapMaxD[1] && m.GainMapMaxD[1] == m.GainMapMaxD[2] &&
+		m.GainMapGammaN[0] == m.GainMapGammaN[1] && m.GainMapGammaN[1] == m.GainMapGammaN[2] &&
+		m.GainMapGammaD[0] == m.GainMapGammaD[1] && m.GainMapGammaD[1] == m.GainMapGammaD[2] &&
+		m.BaseOffsetN[0] == m.BaseOffsetN[1] && m.BaseOffsetN[1] == m.BaseOffsetN[2] &&
+		m.BaseOffsetD[0] == m.BaseOffsetD[1] && m.BaseOffsetD[1] == m.BaseOffsetD[2] &&
+		m.AltOffsetN[0] == m.AltOffsetN[1] && m.AltOffsetN[1] == m.AltOffsetN[2] &&
+		m.AltOffsetD[0] == m.AltOffsetD[1] && m.AltOffsetD[1] == m.AltOffsetD[2]
 }
 
 func floatToSignedFraction(v float32, numerator *int32, denominator *uint32) error {
