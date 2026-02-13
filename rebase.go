@@ -83,7 +83,14 @@ func RebaseUltraHDR(data []byte, newSDR image.Image, opt *RebaseOptions) (*Rebas
 			return nil, err
 		}
 	}
-	container, err := assembleContainerVipsLike(primaryOut, gainmapJpeg, exif, icc, split.Segs.SecondaryXMP, split.Segs.SecondaryISO)
+	secondaryISO := split.Segs.SecondaryISO
+	if len(secondaryISO) == 0 && split.Meta != nil {
+		secondaryISO, err = buildIsoPayload(split.Meta)
+		if err != nil {
+			return nil, err
+		}
+	}
+	container, err := assembleContainerVipsLike(primaryOut, gainmapJpeg, exif, icc, split.Segs.SecondaryXMP, secondaryISO)
 	if err != nil {
 		return nil, err
 	}

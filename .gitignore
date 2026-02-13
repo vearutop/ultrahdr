@@ -4,4 +4,4 @@
 /bench-*.txt
 /vendor
 /bin
-/testdata/resizejpeg_*.jpg
+/src

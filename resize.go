@@ -73,7 +73,14 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 	if err != nil {
 		return nil, fmt.Errorf("extract exif and icc: %w", err)
 	}
-	container, err := assembleContainerVipsLike(primaryThumb, gainmapThumb, exif, icc, sr.Segs.SecondaryXMP, sr.Segs.SecondaryISO)
+	secondaryISO := sr.Segs.SecondaryISO
+	if len(secondaryISO) == 0 && sr.Meta != nil {
+		secondaryISO, err = buildIsoPayload(sr.Meta)
+		if err != nil {
+			return nil, fmt.Errorf("encode gainmap iso: %w", err)
+		}
+	}
+	container, err := assembleContainerVipsLike(primaryThumb, gainmapThumb, exif, icc, sr.Segs.SecondaryXMP, secondaryISO)
 	if err != nil {
 		return nil, fmt.Errorf("assemble container: %w", err)
 	}
