@@ -34,20 +34,14 @@ type ResizeResult struct {
 	Gainmap   []byte
 }
 
-// ResizeJPEGSpec describes one output variant for ResizeJPEGBatch.
-type ResizeJPEGSpec struct {
-	Name          string
+// ResizeSpec describes one output variant for ResizeJPEGBatch.
+type ResizeSpec struct {
 	Width         uint
 	Height        uint
 	Quality       int
 	Interpolation Interpolation
 	KeepMeta      bool
-}
-
-// ResizeJPEGResult contains one ResizeJPEGBatch output and the corresponding spec.
-type ResizeJPEGResult struct {
-	Spec ResizeJPEGSpec
-	Data []byte
+	ReceiveResult func(data []byte, err error)
 }
 
 // ResizeUltraHDR resizes an UltraHDR JPEG container to the requested dimensions.
@@ -119,31 +113,39 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 // interpolation. When keepMeta is true, EXIF and ICC segments are preserved.
 // When keepMeta is false and input is a wide-gamut profile, output pixels are converted to sRGB.
 func ResizeJPEG(data []byte, width, height uint, quality int, interp Interpolation, keepMeta bool) ([]byte, error) {
-	specs := []ResizeJPEGSpec{{
+	var (
+		res []byte
+		err error
+	)
+	specs := []ResizeSpec{{
 		Width:         width,
 		Height:        height,
 		Quality:       quality,
 		Interpolation: interp,
 		KeepMeta:      keepMeta,
+		ReceiveResult: func(d []byte, e error) {
+			res = d
+			err = e
+		},
 	}}
-	out, err := ResizeJPEGBatch(data, specs)
+	err = ResizeJPEGBatch(data, specs)
 	if err != nil {
 		return nil, err
 	}
-	return out[0].Data, nil
+	return res, err
 }
 
 // ResizeJPEGBatch resizes one JPEG into multiple outputs with a single source decode.
 // For each spec: when KeepMeta is true EXIF/ICC are preserved; otherwise output is metadata-free.
 // Metadata-free outputs are converted to sRGB when source profile is recognized as wide gamut.
-func ResizeJPEGBatch(data []byte, specs []ResizeJPEGSpec) ([]ResizeJPEGResult, error) {
+func ResizeJPEGBatch(data []byte, specs []ResizeSpec) error {
 	if len(specs) == 0 {
-		return nil, errors.New("no resize specs provided")
+		return errors.New("no resize specs provided")
 	}
 
 	for _, s := range specs {
 		if s.Width == 0 || s.Height == 0 {
-			return nil, errors.New("invalid target dimensions")
+			return errors.New("invalid target dimensions")
 		}
 	}
 
@@ -163,7 +165,7 @@ func ResizeJPEGBatch(data []byte, specs []ResizeJPEGSpec) ([]ResizeJPEGResult, e
 
 	srcImg, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	type resizedKey struct {
@@ -179,9 +181,8 @@ func ResizeJPEGBatch(data []byte, specs []ResizeJPEGSpec) ([]ResizeJPEGResult, e
 
 	resizedCache := map[resizedKey]image.Image{}
 	convertedCache := map[convertedKey]image.Image{}
-	output := make([]ResizeJPEGResult, len(specs))
 
-	for i, spec := range specs {
+	for _, spec := range specs {
 		rk := resizedKey{w: int(spec.Width), h: int(spec.Height), interp: spec.Interpolation}
 		resized, ok := resizedCache[rk]
 		if !ok {
@@ -209,21 +210,25 @@ func ResizeJPEGBatch(data []byte, specs []ResizeJPEGSpec) ([]ResizeJPEGResult, e
 
 		out, err := encodeWithQuality(converted, spec.Quality)
 		if err != nil {
-			return nil, err
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
 		}
 		if len(segs) > 0 {
 			out, err = insertAppSegments(out, segs)
 			if err != nil {
-				return nil, err
+				if spec.ReceiveResult != nil {
+					spec.ReceiveResult(nil, err)
+				}
 			}
 		}
-		output[i] = ResizeJPEGResult{
-			Spec: spec,
-			Data: out,
+
+		if spec.ReceiveResult != nil {
+			spec.ReceiveResult(out, err)
 		}
 	}
 
-	return output, nil
+	return nil
 }
 
 // ResizeUltraHDRFile reads an UltraHDR JPEG from inPath, resizes it, and writes
