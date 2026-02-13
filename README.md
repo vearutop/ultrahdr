@@ -2,6 +2,23 @@
 
 This is a minimal, pure-Go port of libultrahdr focused on correctness and portability.
 
+## Why?
+
+UltraHDR is an emerging format of presenting true HDR images with a great level of compatibility with legacy apps and devices. 
+If you're interested in this topic, check https://gregbenzphotography.com/hdr/ for more context.
+
+Because this technology is a relatively new, and is built on top of another relatively new (HDR displays) technology, tooling landscape is pretty sparse now.
+
+Existing solutions for Go require CGO builds with non-trivial dependencies and environment requirements.
+
+This project started as an experiment with `codex` LLM tool, with human steering and testing it turned out to be a success. 
+Resulting code leverages Go's cross-compiltion and powers statically built binaries with no depencies, it also bridges the way to new features like `uhdrtool rebase`. 
+
+Initial development log (colored output in terminal):
+```
+curl -s https://raw.githubusercontent.com/vearutop/ultrahdr/refs/heads/master/testdata/codex.log
+```
+
 ## Usage
 
 ```go
