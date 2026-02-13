@@ -10,7 +10,7 @@ type rgb struct {
 	r, g, b float32
 }
 
-func sampleSDR(img image.Image, x, y int) rgb {
+func sampleSDRInProfile(img image.Image, x, y int, src colorProfile, dstGamut colorGamut) rgb {
 	b := img.Bounds()
 	if x < b.Min.X {
 		x = b.Min.X
@@ -25,12 +25,12 @@ func sampleSDR(img image.Image, x, y int) rgb {
 		y = b.Max.Y - 1
 	}
 	r, g, b2, _ := img.At(x, y).RGBA()
-	// RGBA returns 16-bit values in [0, 65535]
-	return rgb{
-		r: srgbInvOetf(float32(r) / 65535.0),
-		g: srgbInvOetf(float32(g) / 65535.0),
-		b: srgbInvOetf(float32(b2) / 65535.0),
+	v := rgb{
+		r: invOETF(float32(r)/65535.0, src.transfer),
+		g: invOETF(float32(g)/65535.0, src.transfer),
+		b: invOETF(float32(b2)/65535.0, src.transfer),
 	}
+	return convertLinearGamut(v, src.gamut, dstGamut)
 }
 
 func isGrayImage(img image.Image) bool {

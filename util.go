@@ -11,3 +11,28 @@ func srgbInvOetf(v float32) float32 {
 	}
 	return float32(math.Pow(float64((v+0.055)/1.055), 2.4))
 }
+
+func srgbOetf(v float32) float32 {
+	if v <= 0.0031308 {
+		return 12.92 * v
+	}
+	return 1.055*float32(math.Pow(float64(v), 1.0/2.4)) - 0.055
+}
+
+func invOETF(v float32, transfer colorTransfer) float32 {
+	switch transfer {
+	case colorTransferGamma22:
+		return float32(math.Pow(float64(v), 2.2))
+	default:
+		return srgbInvOetf(v)
+	}
+}
+
+func oETF(v float32, transfer colorTransfer) float32 {
+	switch transfer {
+	case colorTransferGamma22:
+		return float32(math.Pow(float64(v), 1.0/2.2))
+	default:
+		return srgbOetf(v)
+	}
+}

@@ -81,10 +81,22 @@ go run ./cmd/uhdrtool detect -in testdata/uhdr.jpg
 
 ## Resizing
 
-Primary image interpolation is built in. Set `ResizeOptions.PrimaryInterpolation` to one of
+Primary image interpolation is built in. Set `ResizeOptions.Interpolation` to one of
 `InterpolationNearest`, `InterpolationBilinear`, `InterpolationBicubic`,
 `InterpolationMitchellNetravali`, `InterpolationLanczos2`, or `InterpolationLanczos3`. Gainmap
 resizing uses the same interpolation mode.
+
+## Compatibility
+
+- Google Pixel UltraHDR JPEG/R files that store gainmap metadata in XMP only (no secondary ISO
+  APP2) are supported. Resize/rebase regenerates ISO 21496-1 metadata for the gainmap JPEG to
+  preserve HDR rendering in Chrome.
+- Older Adobe Camera Raw UltraHDR files are supported when gainmap XMP values are encoded as
+  `rdf:Seq` (`<rdf:li>...`) entries instead of attribute values.
+- Containers with embedded JPEG thumbnails are handled using MPF image ranges, so split/resize
+  targets the correct primary and gainmap images.
+- Rebase applies ICC-aware gamut alignment for sRGB, Display P3, and Adobe RGB primaries before
+  gainmap math.
 
 ## Detection
 
@@ -113,11 +125,23 @@ if err != nil {
 _ = os.WriteFile("output.jpg", resized, 0o644)
 ```
 
+`ResizeJPEG` behavior:
+- `keepMeta=true`: preserves EXIF/ICC (including Display P3 and Adobe RGB profiles).
+- `keepMeta=false`: strips metadata and converts Display P3/Adobe RGB input to sRGB pixels for
+  web-safe output.
+
+Batch resize API:
+- `ResizeJPEGBatch` accepts multiple `ResizeJPEGSpec` entries and performs a single source decode.
+- Returns `[]ResizeJPEGResult` (`Spec` + `Data`) to avoid index-only output handling.
+- Reuses resized/converted intermediate images across variants (for example, multiple qualities at
+  the same dimensions).
+
 ## Limitations
 
 - SDR base image is assumed to be sRGB.
 - HDR image input is assumed to be linear RGB relative to SDR white.
-- No gamut conversion or transfer function conversion.
 - Gain map sampling uses nearest-neighbor.
 - Only XMP + ISO 21496-1 gain map metadata are generated.
 - `ResizeJPEG` metadata preservation is limited to EXIF and ICC segments (XMP is not preserved).
+- Full ICC color management is not implemented; only sRGB/Display P3/Adobe RGB primary profile
+  handling is applied in rebase and metadata-stripped ResizeJPEG output.

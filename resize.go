@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"image"
+	"image/color"
 	"image/draw"
 	"math"
 	"os"
@@ -31,6 +32,22 @@ type ResizeResult struct {
 	Container []byte
 	Primary   []byte
 	Gainmap   []byte
+}
+
+// ResizeJPEGSpec describes one output variant for ResizeJPEGBatch.
+type ResizeJPEGSpec struct {
+	Name          string
+	Width         uint
+	Height        uint
+	Quality       int
+	Interpolation Interpolation
+	KeepMeta      bool
+}
+
+// ResizeJPEGResult contains one ResizeJPEGBatch output and the corresponding spec.
+type ResizeJPEGResult struct {
+	Spec ResizeJPEGSpec
+	Data []byte
 }
 
 // ResizeUltraHDR resizes an UltraHDR JPEG container to the requested dimensions.
@@ -73,7 +90,14 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 	if err != nil {
 		return nil, fmt.Errorf("extract exif and icc: %w", err)
 	}
-	container, err := assembleContainerVipsLike(primaryThumb, gainmapThumb, exif, icc, sr.Segs.SecondaryXMP, sr.Segs.SecondaryISO)
+	secondaryISO := sr.Segs.SecondaryISO
+	if len(secondaryISO) == 0 && sr.Meta != nil {
+		secondaryISO, err = buildIsoPayload(sr.Meta)
+		if err != nil {
+			return nil, fmt.Errorf("encode gainmap iso: %w", err)
+		}
+	}
+	container, err := assembleContainerVipsLike(primaryThumb, gainmapThumb, exif, icc, sr.Segs.SecondaryXMP, secondaryISO)
 	if err != nil {
 		return nil, fmt.Errorf("assemble container: %w", err)
 	}
@@ -93,24 +117,113 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 
 // ResizeJPEG resizes a regular JPEG to the requested dimensions using the built-in
 // interpolation. When keepMeta is true, EXIF and ICC segments are preserved.
+// When keepMeta is false and input is a wide-gamut profile, output pixels are converted to sRGB.
 func ResizeJPEG(data []byte, width, height uint, quality int, interp Interpolation, keepMeta bool) ([]byte, error) {
-	if width <= 0 || height <= 0 {
-		return nil, errors.New("invalid target dimensions")
+	specs := []ResizeJPEGSpec{{
+		Width:         width,
+		Height:        height,
+		Quality:       quality,
+		Interpolation: interp,
+		KeepMeta:      keepMeta,
+	}}
+	out, err := ResizeJPEGBatch(data, specs)
+	if err != nil {
+		return nil, err
 	}
-	var segs []appSegment
-	if keepMeta {
-		exif, icc, err := extractExifAndIcc(data)
+	return out[0].Data, nil
+}
+
+// ResizeJPEGBatch resizes one JPEG into multiple outputs with a single source decode.
+// For each spec: when KeepMeta is true EXIF/ICC are preserved; otherwise output is metadata-free.
+// Metadata-free outputs are converted to sRGB when source profile is recognized as wide gamut.
+func ResizeJPEGBatch(data []byte, specs []ResizeJPEGSpec) ([]ResizeJPEGResult, error) {
+	if len(specs) == 0 {
+		return nil, errors.New("no resize specs provided")
+	}
+
+	for _, s := range specs {
+		if s.Width == 0 || s.Height == 0 {
+			return nil, errors.New("invalid target dimensions")
+		}
+	}
+
+	srcProfile := colorProfile{gamut: colorGamutSRGB, transfer: colorTransferSRGB}
+	exif, icc, err := extractExifAndIcc(data)
+	if err == nil {
+		srcProfile = detectColorProfileFromICCProfile(collectICCProfile(icc))
+	}
+
+	keepMetaSegs := make([]appSegment, 0, 1+len(icc))
+	if exif != nil {
+		keepMetaSegs = append(keepMetaSegs, appSegment{marker: markerAPP1, payload: exif})
+	}
+	for _, seg := range icc {
+		keepMetaSegs = append(keepMetaSegs, appSegment{marker: markerAPP2, payload: seg})
+	}
+
+	srcImg, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	type resizedKey struct {
+		w      int
+		h      int
+		interp Interpolation
+	}
+	type convertedKey struct {
+		resizedKey
+
+		profile colorProfile
+	}
+
+	resizedCache := map[resizedKey]image.Image{}
+	convertedCache := map[convertedKey]image.Image{}
+	output := make([]ResizeJPEGResult, len(specs))
+
+	for i, spec := range specs {
+		rk := resizedKey{w: int(spec.Width), h: int(spec.Height), interp: spec.Interpolation}
+		resized, ok := resizedCache[rk]
+		if !ok {
+			resized = resizeImageInterpolated(srcImg, rk.w, rk.h, rk.interp)
+			resizedCache[rk] = resized
+		}
+
+		dstProfile := srcProfile
+		var segs []appSegment
+		if spec.KeepMeta {
+			segs = keepMetaSegs
+		} else {
+			dstProfile = colorProfile{gamut: colorGamutSRGB, transfer: colorTransferSRGB}
+		}
+
+		ck := convertedKey{resizedKey: rk, profile: dstProfile}
+		converted, ok := convertedCache[ck]
+		if !ok {
+			converted = resized
+			if dstProfile != srcProfile {
+				converted = convertImageProfile(converted, srcProfile, dstProfile)
+			}
+			convertedCache[ck] = converted
+		}
+
+		out, err := encodeWithQuality(converted, spec.Quality)
 		if err != nil {
 			return nil, err
 		}
-		if exif != nil {
-			segs = append(segs, appSegment{marker: markerAPP1, payload: exif})
+		if len(segs) > 0 {
+			out, err = insertAppSegments(out, segs)
+			if err != nil {
+				return nil, err
+			}
 		}
-		for _, seg := range icc {
-			segs = append(segs, appSegment{marker: markerAPP2, payload: seg})
+		output[i] = ResizeJPEGResult{
+			Spec: spec,
+			Data: out,
 		}
 	}
-	return resizeJPEG(data, width, height, segs, quality, interp)
+
+	return output, nil
 }
 
 // ResizeUltraHDRFile reads an UltraHDR JPEG from inPath, resizes it, and writes
@@ -166,30 +279,18 @@ const (
 )
 
 func resizeJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, interp Interpolation) ([]byte, error) {
+	srgbProfile := colorProfile{gamut: colorGamutSRGB, transfer: colorTransferSRGB}
+	return resizeJPEGWithProfile(jpegData, w, h, segs, quality, interp, srgbProfile, srgbProfile)
+}
+
+func resizeJPEGWithProfile(jpegData []byte, w, h uint, segs []appSegment, quality int, interp Interpolation, srcProfile, dstProfile colorProfile) ([]byte, error) {
 	img, _, err := image.Decode(bytes.NewReader(jpegData))
 	if err != nil {
 		return nil, err
 	}
-	var outImg image.Image
-	switch src := img.(type) {
-	case *image.YCbCr:
-		outImg = resizeYCbCrInterpolated(src, int(w), int(h), interp)
-	case *image.Gray:
-		outImg = resizeGrayInterpolated(src, int(w), int(h), interp)
-	case *image.Gray16:
-		outImg = resizeGray16Interpolated(src, int(w), int(h), interp)
-	case *image.RGBA:
-		outImg = resizeRGBAInterpolated(src, int(w), int(h), interp)
-	case *image.NRGBA:
-		outImg = resizeNRGBAInterpolated(src, int(w), int(h), interp)
-	case *image.RGBA64:
-		outImg = resizeRGBA64Interpolated(src, int(w), int(h), interp)
-	case *image.NRGBA64:
-		outImg = resizeNRGBA64Interpolated(src, int(w), int(h), interp)
-	default:
-		dst := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
-		nearestScale(dst, img)
-		outImg = dst
+	outImg := resizeImageInterpolated(img, int(w), int(h), interp)
+	if srcProfile != dstProfile {
+		outImg = convertImageProfile(outImg, srcProfile, dstProfile)
 	}
 
 	out, err := encodeWithQuality(outImg, quality)
@@ -210,27 +311,7 @@ func resizeGainmapJPEG(jpegData []byte, w, h uint, segs []appSegment, quality in
 	if meta == nil {
 		return nil, errors.New("gainmap metadata missing")
 	}
-	var outImg image.Image
-	switch src := img.(type) {
-	case *image.YCbCr:
-		outImg = resizeYCbCrInterpolated(src, int(w), int(h), interp)
-	case *image.Gray:
-		outImg = resizeGrayInterpolated(src, int(w), int(h), interp)
-	case *image.Gray16:
-		outImg = resizeGray16Interpolated(src, int(w), int(h), interp)
-	case *image.RGBA:
-		outImg = resizeRGBAInterpolated(src, int(w), int(h), interp)
-	case *image.NRGBA:
-		outImg = resizeNRGBAInterpolated(src, int(w), int(h), interp)
-	case *image.RGBA64:
-		outImg = resizeRGBA64Interpolated(src, int(w), int(h), interp)
-	case *image.NRGBA64:
-		outImg = resizeNRGBA64Interpolated(src, int(w), int(h), interp)
-	default:
-		dst := image.NewRGBA(image.Rect(0, 0, int(w), int(h)))
-		nearestScale(dst, img)
-		outImg = dst
-	}
+	outImg := resizeImageInterpolated(img, int(w), int(h), interp)
 	out, err := encodeWithQuality(outImg, quality)
 	if err != nil {
 		return nil, err
@@ -239,6 +320,50 @@ func resizeGainmapJPEG(jpegData []byte, w, h uint, segs []appSegment, quality in
 		return insertAppSegments(out, segs)
 	}
 	return out, nil
+}
+
+func resizeImageInterpolated(img image.Image, w, h int, interp Interpolation) image.Image {
+	switch src := img.(type) {
+	case *image.YCbCr:
+		return resizeYCbCrInterpolated(src, w, h, interp)
+	case *image.Gray:
+		return resizeGrayInterpolated(src, w, h, interp)
+	case *image.Gray16:
+		return resizeGray16Interpolated(src, w, h, interp)
+	case *image.RGBA:
+		return resizeRGBAInterpolated(src, w, h, interp)
+	case *image.NRGBA:
+		return resizeNRGBAInterpolated(src, w, h, interp)
+	case *image.RGBA64:
+		return resizeRGBA64Interpolated(src, w, h, interp)
+	case *image.NRGBA64:
+		return resizeNRGBA64Interpolated(src, w, h, interp)
+	default:
+		dst := image.NewRGBA(image.Rect(0, 0, w, h))
+		nearestScale(dst, img)
+		return dst
+	}
+}
+
+func convertImageProfile(img image.Image, from, to colorProfile) image.Image {
+	if from == to {
+		return img
+	}
+	b := img.Bounds()
+	out := image.NewNRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			v := sampleSDRInProfile(img, x, y, from, to.gamut)
+			_, _, _, a := img.At(x, y).RGBA()
+			out.SetNRGBA(x-b.Min.X, y-b.Min.Y, color.NRGBA{
+				R: uint8(clamp01(oETF(v.r, to.transfer))*255.0 + 0.5),
+				G: uint8(clamp01(oETF(v.g, to.transfer))*255.0 + 0.5),
+				B: uint8(clamp01(oETF(v.b, to.transfer))*255.0 + 0.5),
+				A: uint8(a >> 8),
+			})
+		}
+	}
+	return out
 }
 
 func resizeYCbCrNearest(src *image.YCbCr, w, h int) *image.YCbCr {

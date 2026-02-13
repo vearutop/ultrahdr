@@ -1,1 +1,5 @@
 uhdr_*
+*.th.jpg
+*.gain.jpg
+*.prim.jpg
+resizejpeg_*.jpg

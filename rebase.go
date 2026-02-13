@@ -26,6 +26,12 @@ type RebaseResult struct {
 // RebaseUltraHDR replaces the primary SDR image while adjusting the gainmap
 // to preserve the original HDR reconstruction as closely as possible.
 func RebaseUltraHDR(data []byte, newSDR image.Image, opt *RebaseOptions) (*RebaseResult, error) {
+	return RebaseUltraHDRWithICCProfile(data, newSDR, nil, opt)
+}
+
+// RebaseUltraHDRWithICCProfile is like RebaseUltraHDR, but allows passing an ICC profile
+// for newSDR explicitly. This enables gamut-aware rebase when the caller has profile bytes.
+func RebaseUltraHDRWithICCProfile(data []byte, newSDR image.Image, newSDRICCProfile []byte, opt *RebaseOptions) (*RebaseResult, error) {
 	if newSDR == nil {
 		return nil, errors.New("new SDR image is nil")
 	}
@@ -48,7 +54,19 @@ func RebaseUltraHDR(data []byte, newSDR image.Image, opt *RebaseOptions) (*Rebas
 		return nil, errors.New("new SDR dimensions must match original")
 	}
 
-	gainmapOut, err := rebaseGainmap(oldSDR, newSDR, gainmapImg, split.Meta)
+	_, oldICCSegs, err := extractExifAndIcc(split.PrimaryJPEG)
+	if err != nil {
+		return nil, err
+	}
+	oldICCProfile := collectICCProfile(oldICCSegs)
+	oldProfile := detectColorProfileFromICCProfile(oldICCProfile)
+	workGamut := oldProfile.gamut
+	newProfile := oldProfile
+	if len(newSDRICCProfile) > 0 {
+		newProfile = detectColorProfileFromICCProfile(newSDRICCProfile)
+	}
+
+	gainmapOut, err := rebaseGainmap(oldSDR, newSDR, gainmapImg, split.Meta, oldProfile, newProfile, workGamut)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +101,14 @@ func RebaseUltraHDR(data []byte, newSDR image.Image, opt *RebaseOptions) (*Rebas
 			return nil, err
 		}
 	}
-	container, err := assembleContainerVipsLike(primaryOut, gainmapJpeg, exif, icc, split.Segs.SecondaryXMP, split.Segs.SecondaryISO)
+	secondaryISO := split.Segs.SecondaryISO
+	if len(secondaryISO) == 0 && split.Meta != nil {
+		secondaryISO, err = buildIsoPayload(split.Meta)
+		if err != nil {
+			return nil, err
+		}
+	}
+	container, err := assembleContainerVipsLike(primaryOut, gainmapJpeg, exif, icc, split.Segs.SecondaryXMP, secondaryISO)
 	if err != nil {
 		return nil, err
 	}
@@ -100,16 +125,19 @@ func RebaseUltraHDRFile(inPath, newSDRPath, outPath string, opt *RebaseOptions, 
 	if err != nil {
 		return err
 	}
-	newSDRFile, err := os.Open(filepath.Clean(newSDRPath))
+	newSDRBytes, err := os.ReadFile(filepath.Clean(newSDRPath))
 	if err != nil {
 		return err
 	}
-	defer newSDRFile.Close()
-	newSDR, _, err := image.Decode(newSDRFile)
+	newSDR, _, err := image.Decode(bytes.NewReader(newSDRBytes))
 	if err != nil {
 		return err
 	}
-	res, err := RebaseUltraHDR(data, newSDR, opt)
+	_, newICCSegs, err := extractExifAndIcc(newSDRBytes)
+	if err != nil {
+		return err
+	}
+	res, err := RebaseUltraHDRWithICCProfile(data, newSDR, collectICCProfile(newICCSegs), opt)
 	if err != nil {
 		return err
 	}
@@ -129,7 +157,7 @@ func RebaseUltraHDRFile(inPath, newSDRPath, outPath string, opt *RebaseOptions, 
 	return nil
 }
 
-func rebaseGainmap(oldSDR, newSDR, gainmap image.Image, meta *GainMapMetadata) (image.Image, error) {
+func rebaseGainmap(oldSDR, newSDR, gainmap image.Image, meta *GainMapMetadata, oldProfile, newProfile colorProfile, workGamut colorGamut) (image.Image, error) {
 	if meta == nil {
 		return nil, errors.New("gainmap metadata missing")
 	}
@@ -145,8 +173,8 @@ func rebaseGainmap(oldSDR, newSDR, gainmap image.Image, meta *GainMapMetadata) (
 		out := image.NewGray(image.Rect(0, 0, w, h))
 		for y := 0; y < h; y++ {
 			for x := 0; x < w; x++ {
-				oldRGB := sampleSDR(oldSDR, b.Min.X+x, b.Min.Y+y)
-				newRGB := sampleSDR(newSDR, b.Min.X+x, b.Min.Y+y)
+				oldRGB := sampleSDRInProfile(oldSDR, b.Min.X+x, b.Min.Y+y, oldProfile, workGamut)
+				newRGB := sampleSDRInProfile(newSDR, b.Min.X+x, b.Min.Y+y, newProfile, workGamut)
 				gx := int(float32(x)/mapScaleX + 0.5)
 				gy := int(float32(y)/mapScaleY + 0.5)
 				if gx < 0 {
@@ -186,8 +214,8 @@ func rebaseGainmap(oldSDR, newSDR, gainmap image.Image, meta *GainMapMetadata) (
 	out := image.NewRGBA(image.Rect(0, 0, w, h))
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
-			oldRGB := sampleSDR(oldSDR, b.Min.X+x, b.Min.Y+y)
-			newRGB := sampleSDR(newSDR, b.Min.X+x, b.Min.Y+y)
+			oldRGB := sampleSDRInProfile(oldSDR, b.Min.X+x, b.Min.Y+y, oldProfile, workGamut)
+			newRGB := sampleSDRInProfile(newSDR, b.Min.X+x, b.Min.Y+y, newProfile, workGamut)
 			gx := int(float32(x)/mapScaleX + 0.5)
 			gy := int(float32(y)/mapScaleY + 0.5)
 			if gx < 0 {
