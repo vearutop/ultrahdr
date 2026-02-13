@@ -95,6 +95,7 @@ resizing uses the same interpolation mode.
   `rdf:Seq` (`<rdf:li>...`) entries instead of attribute values.
 - Containers with embedded JPEG thumbnails are handled using MPF image ranges, so split/resize
   targets the correct primary and gainmap images.
+- Rebase applies ICC-aware gamut alignment for sRGB and Display P3 primaries before gainmap math.
 
 ## Detection
 
@@ -131,3 +132,5 @@ _ = os.WriteFile("output.jpg", resized, 0o644)
 - Gain map sampling uses nearest-neighbor.
 - Only XMP + ISO 21496-1 gain map metadata are generated.
 - `ResizeJPEG` metadata preservation is limited to EXIF and ICC segments (XMP is not preserved).
+- Full ICC color management is not implemented; only sRGB/Display P3 primary gamut alignment is
+  applied in rebase.

@@ -33,6 +33,11 @@ func sampleSDR(img image.Image, x, y int) rgb {
 	}
 }
 
+func sampleSDRInGamut(img image.Image, x, y int, srcGamut, dstGamut colorGamut) rgb {
+	v := sampleSDR(img, x, y)
+	return convertLinearGamut(v, srcGamut, dstGamut)
+}
+
 func isGrayImage(img image.Image) bool {
 	switch img.(type) {
 	case *image.Gray, *image.Gray16:
