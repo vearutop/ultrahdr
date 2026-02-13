@@ -153,7 +153,7 @@ func ResizeJPEGBatch(data []byte, specs []ResizeJPEGSpec) ([]ResizeJPEGResult, e
 		srcProfile = detectColorProfileFromICCProfile(collectICCProfile(icc))
 	}
 
-	var keepMetaSegs []appSegment
+	keepMetaSegs := make([]appSegment, 0, 1+len(icc))
 	if exif != nil {
 		keepMetaSegs = append(keepMetaSegs, appSegment{marker: markerAPP1, payload: exif})
 	}
@@ -173,6 +173,7 @@ func ResizeJPEGBatch(data []byte, specs []ResizeJPEGSpec) ([]ResizeJPEGResult, e
 	}
 	type convertedKey struct {
 		resizedKey
+
 		profile colorProfile
 	}
 
