@@ -75,6 +75,12 @@ go run ./cmd/uhdrtool join -meta meta.json -primary primary.jpg -gainmap gainmap
 # rebase on a better SDR (approximate gainmap adjustment)
 go run ./cmd/uhdrtool rebase -in testdata/uhdr.jpg -primary better_sdr.jpg -out better_uhdr.jpg
 
+# rebase using HDR EXR (fresh gainmap generation)
+go run ./cmd/uhdrtool rebase -primary sdr.jpg -exr hdr.exr -out output.jpg
+
+# rebase using HDR TIFF (fresh gainmap generation)
+go run ./cmd/uhdrtool rebase -primary sdr.jpg -tiff hdr.tif -out output.jpg
+
 # detect UltraHDR
 go run ./cmd/uhdrtool detect -in testdata/uhdr.jpg
 ```
