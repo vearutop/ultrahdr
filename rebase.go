@@ -12,8 +12,12 @@ import (
 
 // RebaseOptions controls gainmap rebase behavior.
 type RebaseOptions struct {
-	BaseQuality    int
-	GainmapQuality int
+	BaseQuality     int
+	GainmapQuality  int
+	GainmapScale    int
+	GainmapGamma    float32
+	UseMultiChannel bool
+	HDRCapacityMax  float32
 }
 
 // RebaseResult contains the rebased container and component JPEGs.
@@ -119,6 +123,40 @@ func RebaseUltraHDRWithICCProfile(data []byte, newSDR image.Image, newSDRICCProf
 	}, nil
 }
 
+func rebaseUltraHDRFromHDR(newSDR image.Image, newSDRICCProfile []byte, hdr *hdrImage, opt *RebaseOptions) (*RebaseResult, *GainMapMetadata, error) {
+	if newSDR == nil || hdr == nil {
+		return nil, nil, errors.New("missing SDR or HDR input")
+	}
+	newProfile := detectColorProfileFromICCProfile(newSDRICCProfile)
+	gainmapOut, meta, err := generateGainmapFromHDR(newSDR, newProfile, hdr, opt)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	gainQ := defaultGainMapQuality
+	baseQ := defaultPrimaryQuality
+	if opt != nil {
+		if opt.GainmapQuality > 0 {
+			gainQ = opt.GainmapQuality
+		}
+		if opt.BaseQuality > 0 {
+			baseQ = opt.BaseQuality
+		}
+	}
+	gainmapJpeg, err := encodeWithQuality(gainmapOut, gainQ)
+	if err != nil {
+		return nil, nil, err
+	}
+	primaryOut, err := encodeWithQuality(newSDR, baseQ)
+	if err != nil {
+		return nil, nil, err
+	}
+	return &RebaseResult{
+		Primary: primaryOut,
+		Gainmap: gainmapJpeg,
+	}, meta, nil
+}
+
 // RebaseUltraHDRFile reads an UltraHDR JPEG, rebases it on newSDRPath, and writes the output.
 func RebaseUltraHDRFile(inPath, newSDRPath, outPath string, opt *RebaseOptions, primaryOut, gainmapOut string) error {
 	data, err := os.ReadFile(filepath.Clean(inPath))
@@ -142,6 +180,138 @@ func RebaseUltraHDRFile(inPath, newSDRPath, outPath string, opt *RebaseOptions, 
 		return err
 	}
 	if err := os.WriteFile(filepath.Clean(outPath), res.Container, 0o644); err != nil {
+		return err
+	}
+	if primaryOut != "" {
+		if err := os.WriteFile(filepath.Clean(primaryOut), res.Primary, 0o644); err != nil {
+			return err
+		}
+	}
+	if gainmapOut != "" {
+		if err := os.WriteFile(filepath.Clean(gainmapOut), res.Gainmap, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RebaseUltraHDRFromEXRFile generates an UltraHDR JPEG from an SDR primary and HDR EXR input.
+func RebaseUltraHDRFromEXRFile(primaryPath, exrPath, outPath string, opt *RebaseOptions, primaryOut, gainmapOut string) error {
+	if primaryPath == "" || exrPath == "" || outPath == "" {
+		return errors.New("missing required arguments")
+	}
+	primaryBytes, err := os.ReadFile(filepath.Clean(primaryPath))
+	if err != nil {
+		return err
+	}
+	newSDR, _, err := image.Decode(bytes.NewReader(primaryBytes))
+	if err != nil {
+		return err
+	}
+	_, newICCSegs, err := extractExifAndIcc(primaryBytes)
+	if err != nil {
+		return err
+	}
+	hdrBytes, err := os.ReadFile(filepath.Clean(exrPath))
+	if err != nil {
+		return err
+	}
+	hdr, err := decodeEXR(hdrBytes)
+	if err != nil {
+		return err
+	}
+
+	res, meta, err := rebaseUltraHDRFromHDR(newSDR, collectICCProfile(newICCSegs), hdr, opt)
+	if err != nil {
+		return err
+	}
+	exif, icc, err := extractExifAndIcc(res.Primary)
+	if err != nil {
+		return err
+	}
+	if len(exif) == 0 && len(icc) == 0 {
+		exif, icc, err = extractExifAndIcc(primaryBytes)
+		if err != nil {
+			return err
+		}
+	}
+	secondaryISO, err := buildIsoPayload(meta)
+	if err != nil {
+		return err
+	}
+	secondaryXMP := buildGainmapXMP(meta)
+	primaryXMP := buildPrimaryXMP(meta, 0)
+	container, err := assembleContainerVipsLikeWithPrimaryXMP(res.Primary, res.Gainmap, exif, icc, primaryXMP, secondaryXMP, secondaryISO)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Clean(outPath), container, 0o644); err != nil {
+		return err
+	}
+	if primaryOut != "" {
+		if err := os.WriteFile(filepath.Clean(primaryOut), res.Primary, 0o644); err != nil {
+			return err
+		}
+	}
+	if gainmapOut != "" {
+		if err := os.WriteFile(filepath.Clean(gainmapOut), res.Gainmap, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// RebaseUltraHDRFromTIFFFile generates an UltraHDR JPEG from an SDR primary and HDR TIFF input.
+func RebaseUltraHDRFromTIFFFile(primaryPath, hdrPath, outPath string, opt *RebaseOptions, primaryOut, gainmapOut string) error {
+	if primaryPath == "" || hdrPath == "" || outPath == "" {
+		return errors.New("missing required arguments")
+	}
+	primaryBytes, err := os.ReadFile(filepath.Clean(primaryPath))
+	if err != nil {
+		return err
+	}
+	newSDR, _, err := image.Decode(bytes.NewReader(primaryBytes))
+	if err != nil {
+		return err
+	}
+	_, newICCSegs, err := extractExifAndIcc(primaryBytes)
+	if err != nil {
+		return err
+	}
+	hdrBytes, err := os.ReadFile(filepath.Clean(hdrPath))
+	if err != nil {
+		return err
+	}
+	hdr, err := decodeTIFFHDR(hdrBytes)
+	if err != nil {
+		return err
+	}
+
+	res, meta, err := rebaseUltraHDRFromHDR(newSDR, collectICCProfile(newICCSegs), hdr, opt)
+	if err != nil {
+		return err
+	}
+	exif, icc, err := extractExifAndIcc(res.Primary)
+	if err != nil {
+		return err
+	}
+	if len(exif) == 0 && len(icc) == 0 {
+		exif, icc, err = extractExifAndIcc(primaryBytes)
+		if err != nil {
+			return err
+		}
+	}
+	secondaryISO, err := buildIsoPayload(meta)
+	if err != nil {
+		return err
+	}
+	secondaryXMP := buildGainmapXMP(meta)
+	primaryXMP := buildPrimaryXMP(meta, 0)
+	container, err := assembleContainerVipsLikeWithPrimaryXMP(res.Primary, res.Gainmap, exif, icc, primaryXMP, secondaryXMP, secondaryISO)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Clean(outPath), container, 0o644); err != nil {
 		return err
 	}
 	if primaryOut != "" {

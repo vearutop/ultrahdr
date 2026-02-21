@@ -126,6 +126,84 @@ func assembleContainerVipsLike(primaryJPEG, gainmapJPEG []byte, exif []byte, icc
 	return final, nil
 }
 
+// assembleContainerVipsLikeWithPrimaryXMP is like assembleContainerVipsLike, but also writes primary XMP.
+func assembleContainerVipsLikeWithPrimaryXMP(primaryJPEG, gainmapJPEG []byte, exif []byte, icc [][]byte, primaryXMP []byte, secondaryXMP []byte, secondaryISO []byte) ([]byte, error) {
+	if len(primaryJPEG) < 2 || len(gainmapJPEG) < 2 {
+		return nil, errors.New("invalid JPEG data")
+	}
+
+	primaryStripped, err := stripAppSegments(primaryJPEG)
+	if err != nil {
+		return nil, err
+	}
+	gainmapStripped, err := stripAppSegments(gainmapJPEG)
+	if err != nil {
+		return nil, err
+	}
+
+	secondaryImageSize := len(gainmapStripped) + appSize(secondaryXMP) + appSize(secondaryISO)
+	if len(primaryXMP) > 0 {
+		updated, err := updatePrimaryXmpLength(primaryXMP, secondaryImageSize)
+		if err != nil {
+			return nil, err
+		}
+		primaryXMP = updated
+	}
+
+	var out bytes.Buffer
+	writeSOI := func() {
+		out.WriteByte(markerStart)
+		out.WriteByte(markerSOI)
+	}
+
+	writeSOI()
+	if len(exif) > 0 {
+		writeAppSegment(&out, markerAPP1, exif)
+	}
+	if len(primaryXMP) > 0 {
+		writeAppSegment(&out, markerAPP1, primaryXMP)
+	}
+
+	isoPrimary := secondaryISO
+	if len(isoPrimary) == 0 {
+		isoPrimary = buildIsoVersionOnly()
+	} else if len(isoPrimary) > len(isoNamespace)+1+4 {
+		// If this is full ISO metadata, keep only version (4 bytes) for primary.
+		isoPrimary = append([]byte(nil), isoPrimary[:len(isoNamespace)+1+4]...)
+	}
+
+	if len(isoPrimary) > 0 {
+		writeAppSegment(&out, markerAPP2, isoPrimary)
+	}
+
+	mpfLen := 2 + calculateMpfSize()
+	primaryImageSize := out.Len() + mpfLen + len(primaryStripped)
+	secondaryOffset := primaryImageSize - out.Len() - 8
+	mpf := generateMpf(primaryImageSize, secondaryImageSize, secondaryOffset)
+	writeAppSegment(&out, markerAPP2, mpf)
+
+	for _, seg := range icc {
+		writeAppSegment(&out, markerAPP2, seg)
+	}
+
+	out.Write(primaryStripped[2:])
+
+	writeSOI()
+	if len(secondaryXMP) > 0 {
+		writeAppSegment(&out, markerAPP1, secondaryXMP)
+	}
+	if len(secondaryISO) > 0 {
+		writeAppSegment(&out, markerAPP2, secondaryISO)
+	}
+	out.Write(gainmapStripped[2:])
+
+	final := out.Bytes()
+	if err := replaceMpfPayload(final); err != nil {
+		return nil, err
+	}
+	return final, nil
+}
+
 func buildIsoVersionOnly() []byte {
 	payload := append(append([]byte{}, []byte(isoNamespace)...), 0)
 	payload = append(payload, 0, 0, 0, 0)

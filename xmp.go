@@ -2,6 +2,7 @@ package ultrahdr
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -195,4 +196,45 @@ func parseXMP(app1 []byte) (*GainMapMetadata, error) {
 		}
 	}
 	return meta, nil
+}
+
+func buildGainmapXMP(meta *GainMapMetadata) []byte {
+	if meta == nil {
+		return nil
+	}
+	format := func(v float32) string {
+		return strconv.FormatFloat(float64(v), 'g', 6, 32)
+	}
+	xml := fmt.Sprintf(
+		`<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.1.2"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/" hdrgm:Version="%s" hdrgm:GainMapMin="%s" hdrgm:GainMapMax="%s" hdrgm:Gamma="%s" hdrgm:OffsetSDR="%s" hdrgm:OffsetHDR="%s" hdrgm:HDRCapacityMin="%s" hdrgm:HDRCapacityMax="%s" hdrgm:BaseRenditionIsHDR="False"/></rdf:RDF></x:xmpmeta>`,
+		meta.Version,
+		format(log2f(meta.MinContentBoost[0])),
+		format(log2f(meta.MaxContentBoost[0])),
+		format(meta.Gamma[0]),
+		format(meta.OffsetSDR[0]),
+		format(meta.OffsetHDR[0]),
+		format(log2f(meta.HDRCapacityMin)),
+		format(log2f(meta.HDRCapacityMax)),
+	)
+	out := make([]byte, 0, len(xmpNamespace)+1+len(xml))
+	out = append(out, []byte(xmpNamespace)...)
+	out = append(out, 0)
+	out = append(out, xml...)
+	return out
+}
+
+func buildPrimaryXMP(meta *GainMapMetadata, secondaryImageSize int) []byte {
+	if meta == nil {
+		return nil
+	}
+	xml := fmt.Sprintf(
+		`<x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="Adobe XMP Core 5.1.2"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description xmlns:Container="http://ns.google.com/photos/1.0/container/" xmlns:Item="http://ns.google.com/photos/1.0/container/item/" xmlns:hdrgm="http://ns.adobe.com/hdr-gain-map/1.0/" hdrgm:Version="%s"><Container:Directory><rdf:Seq><rdf:li rdf:parseType="Resource"><Container:Item Item:Semantic="Primary" Item:Mime="image/jpeg"/></rdf:li><rdf:li rdf:parseType="Resource"><Container:Item Item:Semantic="GainMap" Item:Mime="image/jpeg" Item:Length="%d"/></rdf:li></rdf:Seq></Container:Directory></rdf:Description></rdf:RDF></x:xmpmeta>`,
+		meta.Version,
+		secondaryImageSize,
+	)
+	out := make([]byte, 0, len(xmpNamespace)+1+len(xml))
+	out = append(out, []byte(xmpNamespace)...)
+	out = append(out, 0)
+	out = append(out, xml...)
+	return out
 }

@@ -2,10 +2,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"image"
 	"os"
 	"path/filepath"
 
@@ -38,6 +40,10 @@ func main() {
 		if err := runJoin(os.Args[2:]); err != nil {
 			fail(err)
 		}
+	case "gmstats":
+		if err := runGainmapStats(os.Args[2:]); err != nil {
+			fail(err)
+		}
 	default:
 		usage()
 		os.Exit(2)
@@ -49,10 +55,13 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "Commands:")
 	fmt.Fprintln(os.Stderr, "  resize -in input.jpg -out output.jpg -w 2400 -h 1600 [-q 85] [-gq 75] [-primary-out p.jpg] [-gainmap-out g.jpg]")
 	fmt.Fprintln(os.Stderr, "  rebase -in uhdr.jpg -primary better_sdr.jpg -out output.jpg [-q 95] [-gq 85] [-primary-out p.jpg] [-gainmap-out g.jpg]")
+	fmt.Fprintln(os.Stderr, "  rebase -primary sdr.jpg -exr hdr.exr -out output.jpg [-q 95] [-gq 85] [-primary-out p.jpg] [-gainmap-out g.jpg]")
+	fmt.Fprintln(os.Stderr, "  rebase -primary sdr.jpg -tiff hdr.tif -out output.jpg [-q 95] [-gq 85] [-primary-out p.jpg] [-gainmap-out g.jpg]")
 	fmt.Fprintln(os.Stderr, "  detect -in input.jpg")
 	fmt.Fprintln(os.Stderr, "  split  -in input.jpg -primary-out primary.jpg -gainmap-out gainmap.jpg [-meta-out meta.json]")
 	fmt.Fprintln(os.Stderr, "  join   -meta meta.json -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
 	fmt.Fprintln(os.Stderr, "        (or) join -template input.jpg -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
+	fmt.Fprintln(os.Stderr, "  gmstats -in gainmap.jpg")
 }
 
 func runResize(args []string) error {
@@ -102,6 +111,8 @@ func runRebase(args []string) error {
 	fs := flag.NewFlagSet("rebase", flag.ContinueOnError)
 	inPath := fs.String("in", "", "input UltraHDR JPEG")
 	primaryPath := fs.String("primary", "", "new SDR JPEG")
+	exrPath := fs.String("exr", "", "HDR OpenEXR input")
+	tiffPath := fs.String("tiff", "", "HDR TIFF input")
 	outPath := fs.String("out", "", "output UltraHDR JPEG")
 	q := fs.Int("q", 95, "base quality")
 	gq := fs.Int("gq", 85, "gainmap quality")
@@ -111,12 +122,27 @@ func runRebase(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	if *inPath == "" || *primaryPath == "" || *outPath == "" {
-		return errors.New("missing required arguments")
-	}
 	opts := &ultrahdr.RebaseOptions{
 		BaseQuality:    *q,
 		GainmapQuality: *gq,
+	}
+	if *exrPath != "" && *tiffPath != "" {
+		return errors.New("use only one of -exr or -tiff")
+	}
+	if *exrPath != "" {
+		if *primaryPath == "" || *outPath == "" {
+			return errors.New("missing required arguments")
+		}
+		return ultrahdr.RebaseUltraHDRFromEXRFile(*primaryPath, *exrPath, *outPath, opts, *primaryOut, *gainmapOut)
+	}
+	if *tiffPath != "" {
+		if *primaryPath == "" || *outPath == "" {
+			return errors.New("missing required arguments")
+		}
+		return ultrahdr.RebaseUltraHDRFromTIFFFile(*primaryPath, *tiffPath, *outPath, opts, *primaryOut, *gainmapOut)
+	}
+	if *inPath == "" || *primaryPath == "" || *outPath == "" {
+		return errors.New("missing required arguments")
 	}
 	return ultrahdr.RebaseUltraHDRFile(*inPath, *primaryPath, *outPath, opts, *primaryOut, *gainmapOut)
 }
@@ -254,6 +280,69 @@ func runJoin(args []string) error {
 		return err
 	}
 	return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
+}
+
+func runGainmapStats(args []string) error {
+	fs := flag.NewFlagSet("gmstats", flag.ContinueOnError)
+	inPath := fs.String("in", "", "gainmap JPEG")
+	fs.SetOutput(os.Stderr)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if *inPath == "" {
+		return errors.New("missing required arguments")
+	}
+	data, err := os.ReadFile(filepath.Clean(*inPath))
+	if err != nil {
+		return err
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+	b := img.Bounds()
+	if b.Empty() {
+		return errors.New("empty image")
+	}
+	minR, minG, minB := uint8(255), uint8(255), uint8(255)
+	maxR, maxG, maxB := uint8(0), uint8(0), uint8(0)
+	var sumR, sumG, sumB uint64
+	var count uint64
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, g, b2, _ := img.At(x, y).RGBA()
+			r8 := uint8(r >> 8)
+			g8 := uint8(g >> 8)
+			b8 := uint8(b2 >> 8)
+			if r8 < minR {
+				minR = r8
+			}
+			if g8 < minG {
+				minG = g8
+			}
+			if b8 < minB {
+				minB = b8
+			}
+			if r8 > maxR {
+				maxR = r8
+			}
+			if g8 > maxG {
+				maxG = g8
+			}
+			if b8 > maxB {
+				maxB = b8
+			}
+			sumR += uint64(r8)
+			sumG += uint64(g8)
+			sumB += uint64(b8)
+			count++
+		}
+	}
+	avgR := float64(sumR) / float64(count)
+	avgG := float64(sumG) / float64(count)
+	avgB := float64(sumB) / float64(count)
+	fmt.Fprintf(os.Stdout, "min=%d,%d,%d max=%d,%d,%d avg=%.2f,%.2f,%.2f\n", minR, minG, minB, maxR, maxG, maxB, avgR, avgG, avgB)
+	return nil
 }
 
 func fail(err error) {
