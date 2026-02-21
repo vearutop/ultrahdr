@@ -196,9 +196,9 @@ func RebaseUltraHDRFile(inPath, newSDRPath, outPath string, opt *RebaseOptions, 
 	return nil
 }
 
-// RebaseUltraHDRFromHDRFile generates an UltraHDR JPEG from an SDR primary and HDR EXR input.
-func RebaseUltraHDRFromHDRFile(primaryPath, hdrPath, outPath string, opt *RebaseOptions, primaryOut, gainmapOut string) error {
-	if primaryPath == "" || hdrPath == "" || outPath == "" {
+// RebaseUltraHDRFromEXRFile generates an UltraHDR JPEG from an SDR primary and HDR EXR input.
+func RebaseUltraHDRFromEXRFile(primaryPath, exrPath, outPath string, opt *RebaseOptions, primaryOut, gainmapOut string) error {
+	if primaryPath == "" || exrPath == "" || outPath == "" {
 		return errors.New("missing required arguments")
 	}
 	primaryBytes, err := os.ReadFile(filepath.Clean(primaryPath))
@@ -213,7 +213,7 @@ func RebaseUltraHDRFromHDRFile(primaryPath, hdrPath, outPath string, opt *Rebase
 	if err != nil {
 		return err
 	}
-	hdrBytes, err := os.ReadFile(filepath.Clean(hdrPath))
+	hdrBytes, err := os.ReadFile(filepath.Clean(exrPath))
 	if err != nil {
 		return err
 	}

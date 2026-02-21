@@ -133,7 +133,7 @@ func runRebase(args []string) error {
 		if *primaryPath == "" || *outPath == "" {
 			return errors.New("missing required arguments")
 		}
-		return ultrahdr.RebaseUltraHDRFromHDRFile(*primaryPath, *exrPath, *outPath, opts, *primaryOut, *gainmapOut)
+		return ultrahdr.RebaseUltraHDRFromEXRFile(*primaryPath, *exrPath, *outPath, opts, *primaryOut, *gainmapOut)
 	}
 	if *tiffPath != "" {
 		if *primaryPath == "" || *outPath == "" {

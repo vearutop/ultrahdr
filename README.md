@@ -62,27 +62,27 @@ func main() {
 
 ```bash
 # resize UltraHDR (writes container + components)
-go run ./cmd/uhdrtool resize -in testdata/uhdr.jpg -out testdata/uhdr_thumb.jpg -w 2400 -h 1600 -q 85 -gq 75 \
+uhdrtool resize -in testdata/uhdr.jpg -out testdata/uhdr_thumb.jpg -w 2400 -h 1600 -q 85 -gq 75 \
   -primary-out testdata/uhdr_thumb_primary.jpg -gainmap-out testdata/uhdr_thumb_gainmap.jpg
 
 # split into components + metadata bundle
-go run ./cmd/uhdrtool split -in testdata/uhdr.jpg \
+uhdrtool split -in testdata/uhdr.jpg \
   -primary-out primary.jpg -gainmap-out gainmap.jpg -meta-out meta.json
 
 # join without the original template
-go run ./cmd/uhdrtool join -meta meta.json -primary primary.jpg -gainmap gainmap.jpg -out out.jpg
+uhdrtool join -meta meta.json -primary primary.jpg -gainmap gainmap.jpg -out out.jpg
 
 # rebase on a better SDR (approximate gainmap adjustment)
-go run ./cmd/uhdrtool rebase -in testdata/uhdr.jpg -primary better_sdr.jpg -out better_uhdr.jpg
+uhdrtool rebase -in testdata/uhdr.jpg -primary better_sdr.jpg -out better_uhdr.jpg
 
-# rebase using HDR EXR (fresh gainmap generation)
-go run ./cmd/uhdrtool rebase -primary sdr.jpg -exr hdr.exr -out output.jpg
+# rebase using HDR EXR (new gainmap generation)
+uhdrtool rebase -primary sdr.jpg -exr hdr.exr -out output.jpg
 
-# rebase using HDR TIFF (fresh gainmap generation)
-go run ./cmd/uhdrtool rebase -primary sdr.jpg -tiff hdr.tif -out output.jpg
+# rebase using HDR TIFF (new gainmap generation)
+uhdrtool rebase -primary sdr.jpg -tiff hdr.tif -out output.jpg
 
 # detect UltraHDR
-go run ./cmd/uhdrtool detect -in testdata/uhdr.jpg
+uhdrtool detect -in testdata/uhdr.jpg
 ```
 
 ## Resizing
