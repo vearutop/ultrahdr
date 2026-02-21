@@ -33,12 +33,13 @@ const (
 	exrChanB     = 2
 )
 
-type HDRImage struct {
+// hdrImage holds linear HDR pixel data in RGB order.
+type hdrImage struct {
 	W, H int
 	Pix  []float32
 }
 
-func (h *HDRImage) At(x, y int) rgb {
+func (h *hdrImage) at(x, y int) rgb {
 	if x < 0 {
 		x = 0
 	}
@@ -63,7 +64,7 @@ type exrChannel struct {
 	role      int
 }
 
-func DecodeEXR(data []byte) (*HDRImage, error) {
+func decodeEXR(data []byte) (*hdrImage, error) {
 	r := bytes.NewReader(data)
 	magic, err := readU32(r)
 	if err != nil {
@@ -182,7 +183,7 @@ func DecodeEXR(data []byte) (*HDRImage, error) {
 		offsets[i] = v
 	}
 
-	hdr := &HDRImage{
+	hdr := &hdrImage{
 		W:   width,
 		H:   height,
 		Pix: make([]float32, width*height*3),
@@ -295,7 +296,7 @@ func parseEXRChannels(data []byte) ([]exrChannel, error) {
 func exrExpectedBlockBytes(width, lines int, channels []exrChannel) int {
 	total := 0
 	for _, ch := range channels {
-		bpp := 0
+		var bpp int
 		switch ch.pixelType {
 		case exrPixelHalf:
 			bpp = 2
@@ -353,12 +354,12 @@ func unshuffleBytes(data []byte) []byte {
 	return out
 }
 
-func exrDecodeBlock(dst *HDRImage, channels []exrChannel, startY, width, lines int, data []byte) error {
+func exrDecodeBlock(dst *hdrImage, channels []exrChannel, startY, width, lines int, data []byte) error {
 	offset := 0
 	for row := 0; row < lines; row++ {
 		y := startY + row
 		for _, ch := range channels {
-			bpp := 0
+			var bpp int
 			switch ch.pixelType {
 			case exrPixelHalf:
 				bpp = 2
@@ -387,7 +388,7 @@ func exrDecodeBlock(dst *HDRImage, channels []exrChannel, startY, width, lines i
 	return nil
 }
 
-func exrApplyLine(dst *HDRImage, role int, y, width int, pixelType int32, line []byte) error {
+func exrApplyLine(dst *hdrImage, role int, y, width int, pixelType int32, line []byte) error {
 	for x := 0; x < width; x++ {
 		var v float32
 		switch pixelType {
@@ -470,7 +471,8 @@ func halfToFloat32(h uint16) float32 {
 	exp := int32(h>>10) & 0x1F
 	mant := int32(h & 0x03FF)
 
-	if exp == 0 {
+	switch exp {
+	case 0:
 		if mant == 0 {
 			return math.Float32frombits(sign << 31)
 		}
@@ -480,14 +482,14 @@ func halfToFloat32(h uint16) float32 {
 		}
 		exp++
 		mant &= 0x03FF
-	} else if exp == 31 {
+	case 31:
 		if mant == 0 {
 			return math.Float32frombits((sign << 31) | 0x7F800000)
 		}
 		return math.Float32frombits((sign << 31) | 0x7F800000 | (uint32(mant) << 13))
 	}
 
-	exp = exp + (127 - 15)
+	exp += (127 - 15)
 	mant <<= 13
 	bits := (sign << 31) | (uint32(exp) << 23) | uint32(mant)
 	return math.Float32frombits(bits)

@@ -14,7 +14,7 @@ const (
 	kHdrOffset    = 1e-7
 )
 
-func generateGainmapFromHDR(sdr image.Image, sdrProfile colorProfile, hdr *HDRImage, opt *RebaseOptions) (image.Image, *GainMapMetadata, error) {
+func generateGainmapFromHDR(sdr image.Image, sdrProfile colorProfile, hdr *hdrImage, opt *RebaseOptions) (image.Image, *GainMapMetadata, error) {
 	if sdr == nil || hdr == nil {
 		return nil, nil, errors.New("missing SDR or HDR input")
 	}
@@ -62,7 +62,7 @@ func generateGainmapFromHDR(sdr image.Image, sdrProfile colorProfile, hdr *HDRIm
 		for x := 0; x < mapW; x++ {
 			srcX := b.Min.X + x*scale
 			sdrRGB := sampleSDRInProfile(sdr, srcX, srcY, sdrProfile, sdrProfile.gamut)
-			hdrRGB := hdr.At(srcX-b.Min.X, srcY-b.Min.Y)
+			hdrRGB := hdr.at(srcX-b.Min.X, srcY-b.Min.Y)
 			hdrRGB = clampRGB(hdrRGB)
 			sdrRGB = clampRGB(sdrRGB)
 

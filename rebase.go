@@ -123,8 +123,7 @@ func RebaseUltraHDRWithICCProfile(data []byte, newSDR image.Image, newSDRICCProf
 	}, nil
 }
 
-// RebaseUltraHDRFromHDR generates a fresh gainmap from an SDR primary and an HDR source.
-func RebaseUltraHDRFromHDR(newSDR image.Image, newSDRICCProfile []byte, hdr *HDRImage, opt *RebaseOptions) (*RebaseResult, *GainMapMetadata, error) {
+func rebaseUltraHDRFromHDR(newSDR image.Image, newSDRICCProfile []byte, hdr *hdrImage, opt *RebaseOptions) (*RebaseResult, *GainMapMetadata, error) {
 	if newSDR == nil || hdr == nil {
 		return nil, nil, errors.New("missing SDR or HDR input")
 	}
@@ -217,12 +216,12 @@ func RebaseUltraHDRFromEXRFile(primaryPath, exrPath, outPath string, opt *Rebase
 	if err != nil {
 		return err
 	}
-	hdr, err := DecodeEXR(hdrBytes)
+	hdr, err := decodeEXR(hdrBytes)
 	if err != nil {
 		return err
 	}
 
-	res, meta, err := RebaseUltraHDRFromHDR(newSDR, collectICCProfile(newICCSegs), hdr, opt)
+	res, meta, err := rebaseUltraHDRFromHDR(newSDR, collectICCProfile(newICCSegs), hdr, opt)
 	if err != nil {
 		return err
 	}
@@ -283,12 +282,12 @@ func RebaseUltraHDRFromTIFFFile(primaryPath, hdrPath, outPath string, opt *Rebas
 	if err != nil {
 		return err
 	}
-	hdr, err := DecodeTIFFHDR(hdrBytes)
+	hdr, err := decodeTIFFHDR(hdrBytes)
 	if err != nil {
 		return err
 	}
 
-	res, meta, err := RebaseUltraHDRFromHDR(newSDR, collectICCProfile(newICCSegs), hdr, opt)
+	res, meta, err := rebaseUltraHDRFromHDR(newSDR, collectICCProfile(newICCSegs), hdr, opt)
 	if err != nil {
 		return err
 	}

@@ -3,13 +3,15 @@ package ultrahdr
 import (
 	"bytes"
 	"errors"
-	_ "golang.org/x/image/tiff"
 	"image"
+
+	// Register the TIFF decoder.
+	_ "golang.org/x/image/tiff"
 )
 
-// DecodeTIFFHDR decodes a TIFF image into a linear HDRImage. It supports
+// decodeTIFFHDR decodes a TIFF image into a linear HDR image. It supports
 // 8/16-bit integer TIFFs via the standard Go decoder.
-func DecodeTIFFHDR(data []byte) (*HDRImage, error) {
+func decodeTIFFHDR(data []byte) (*hdrImage, error) {
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -19,7 +21,7 @@ func DecodeTIFFHDR(data []byte) (*HDRImage, error) {
 	if w <= 0 || h <= 0 {
 		return nil, errors.New("invalid TIFF dimensions")
 	}
-	out := &HDRImage{
+	out := &hdrImage{
 		W:   w,
 		H:   h,
 		Pix: make([]float32, w*h*3),
