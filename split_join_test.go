@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -196,7 +195,7 @@ func TestResizeSDRKeepMeta(t *testing.T) {
 		t.Skip("primary jpeg has no exif/icc to verify")
 	}
 
-	noMeta, err := ResizeSDR(io.NopCloser(bytes.NewReader(split.Primary)), 600, 400, 85, InterpolationBilinear, false)
+	noMeta, err := ResizeSDR(bytes.NewReader(split.Primary), 600, 400, 85, InterpolationBilinear, false)
 	if err != nil {
 		t.Fatalf("resize jpeg no meta: %v", err)
 	}
@@ -208,7 +207,7 @@ func TestResizeSDRKeepMeta(t *testing.T) {
 		t.Fatalf("unexpected metadata preserved")
 	}
 
-	withMeta, err := ResizeSDR(io.NopCloser(bytes.NewReader(split.Primary)), 600, 400, 85, InterpolationBilinear, true)
+	withMeta, err := ResizeSDR(bytes.NewReader(split.Primary), 600, 400, 85, InterpolationBilinear, true)
 	if err != nil {
 		t.Fatalf("resize jpeg keep meta: %v", err)
 	}
@@ -279,7 +278,7 @@ func TestResizeParallelNoRace(t *testing.T) {
 					t.Logf("%s worker=%d iter=%d ResizeUltraHDR=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
 				}
 				start = time.Now()
-				if _, err := ResizeSDR(io.NopCloser(bytes.NewReader(jpegData)), uint(width), uint(height), 85, InterpolationLanczos2, false); err != nil {
+				if _, err := ResizeSDR(bytes.NewReader(jpegData), uint(width), uint(height), 85, InterpolationLanczos2, false); err != nil {
 					errCh <- err
 					return
 				}

@@ -106,7 +106,7 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 // ResizeSDR resizes a regular JPEG to the requested dimensions using the built-in
 // interpolation. When keepMeta is true, EXIF and ICC segments are preserved.
 // When keepMeta is false and input is a wide-gamut profile, output pixels are converted to sRGB.
-func ResizeSDR(r io.ReadCloser, width, height uint, quality int, interp Interpolation, keepMeta bool) ([]byte, error) {
+func ResizeSDR(r io.Reader, width, height uint, quality int, interp Interpolation, keepMeta bool) ([]byte, error) {
 	var (
 		res []byte
 		err error
@@ -132,14 +132,13 @@ func ResizeSDR(r io.ReadCloser, width, height uint, quality int, interp Interpol
 // ResizeSDRBatch resizes one JPEG into multiple outputs with a single source decode.
 // For each spec: when KeepMeta is true EXIF/ICC are preserved; otherwise output is metadata-free.
 // Metadata-free outputs are converted to sRGB when source profile is recognized as wide gamut.
-func ResizeSDRBatch(r io.ReadCloser, specs []ResizeSpec) error {
+func ResizeSDRBatch(r io.Reader, specs []ResizeSpec) error {
 	if len(specs) == 0 {
 		return errors.New("no resize specs provided")
 	}
 	if r == nil {
 		return errors.New("missing input reader")
 	}
-	defer r.Close()
 
 	for _, s := range specs {
 		if s.Width == 0 || s.Height == 0 {
