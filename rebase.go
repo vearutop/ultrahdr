@@ -113,7 +113,7 @@ func rebaseWithOptions(data []byte, newSDR image.Image, opt *RebaseOptions) (*Re
 	if newSDR == nil {
 		return nil, errors.New("new SDR image is nil")
 	}
-	split, err := Split(data)
+	split, err := Split(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}

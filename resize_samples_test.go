@@ -3,7 +3,6 @@ package ultrahdr
 import (
 	"bytes"
 	"image"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,16 +32,19 @@ func TestResizeSDRSampleColorSpaces(t *testing.T) {
 	for _, sample := range samples {
 		sample := sample
 		t.Run(filepath.Base(sample), func(t *testing.T) {
-			data, err := os.ReadFile(sample)
+			f, err := os.Open(sample)
 			if err != nil {
-				t.Fatalf("read sample: %v", err)
+				t.Fatalf("open sample: %v", err)
 			}
-
-			withoutMeta, err := ResizeSDR(io.NopCloser(bytes.NewReader(data)), outW, outH, quality, InterpolationLanczos2, false)
+			withoutMeta, err := ResizeSDR(f, outW, outH, quality, InterpolationLanczos2, false)
 			if err != nil {
 				t.Fatalf("resize without meta: %v", err)
 			}
-			withMeta, err := ResizeSDR(io.NopCloser(bytes.NewReader(data)), outW, outH, quality, InterpolationLanczos2, true)
+			f, err = os.Open(sample)
+			if err != nil {
+				t.Fatalf("open sample: %v", err)
+			}
+			withMeta, err := ResizeSDR(f, outW, outH, quality, InterpolationLanczos2, true)
 			if err != nil {
 				t.Fatalf("resize with meta: %v", err)
 			}

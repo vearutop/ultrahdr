@@ -85,7 +85,7 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 		t.Fatalf("write uhdr_repacked.jpg: %v", err)
 	}
 
-	sr2, err := Split(result.Container)
+	sr2, err := Split(bytes.NewReader(result.Container))
 	if err != nil {
 		t.Fatalf("split after join: %v", err)
 	}
@@ -179,11 +179,12 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 }
 
 func TestResizeSDRKeepMeta(t *testing.T) {
-	data, err := os.ReadFile("testdata/small_uhdr.jpg")
+	f, err := os.Open("testdata/small_uhdr.jpg")
 	if err != nil {
-		t.Fatalf("read uhdr: %v", err)
+		t.Fatalf("open uhdr: %v", err)
 	}
-	split, err := Split(data)
+	defer f.Close()
+	split, err := Split(f)
 	if err != nil {
 		t.Fatalf("split: %v", err)
 	}
@@ -245,7 +246,7 @@ func TestResizeParallelNoRace(t *testing.T) {
 	iterations := 3
 	width, height := 300, 200
 
-	sr, err := Split(data)
+	sr, err := Split(bytes.NewReader(data))
 	if err != nil {
 		t.Fatalf("split: %v", err)
 	}

@@ -197,11 +197,12 @@ func runSplit(args []string) error {
 	if *inPath == "" || *primaryOut == "" || *gainmapOut == "" {
 		return errors.New("missing required arguments")
 	}
-	data, err := os.ReadFile(filepath.Clean(*inPath))
+	f, err := os.Open(filepath.Clean(*inPath))
 	if err != nil {
 		return err
 	}
-	split, err := ultrahdr.Split(data)
+	defer f.Close()
+	split, err := ultrahdr.Split(f)
 	if err != nil {
 		return err
 	}
@@ -288,10 +289,11 @@ func runJoin(args []string) error {
 		}
 		return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
 	}
-	template, err := os.ReadFile(filepath.Clean(*templatePath))
+	template, err := os.Open(filepath.Clean(*templatePath))
 	if err != nil {
 		return err
 	}
+	defer template.Close()
 	split, err := ultrahdr.Split(template)
 	if err != nil {
 		return err
@@ -301,7 +303,7 @@ func runJoin(args []string) error {
 		return err
 	}
 	if len(exif) == 0 && len(icc) == 0 {
-		exif, icc, err = ultrahdr.ExtractEXIFAndICC(template)
+		exif, icc, err = ultrahdr.ExtractEXIFAndICC(split.Primary)
 		if err != nil {
 			return err
 		}

@@ -44,7 +44,7 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 	if width <= 0 || height <= 0 {
 		return nil, errors.New("invalid target dimensions")
 	}
-	sr, err := Split(data)
+	sr, err := Split(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("split: %w", err)
 	}
