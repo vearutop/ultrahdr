@@ -9,3 +9,12 @@ func AssembleContainer(primaryJPEG, gainmapJPEG []byte, exif []byte, icc [][]byt
 func ExtractEXIFAndICC(jpegData []byte) ([]byte, [][]byte, error) {
 	return extractExifAndIcc(jpegData)
 }
+
+// ExtractGainmapMetadataSegments returns XMP/ISO APP payloads from a gainmap JPEG.
+func ExtractGainmapMetadataSegments(gainmapJPEG []byte) ([]byte, []byte, error) {
+	app1, app2, err := extractAppSegments(gainmapJPEG)
+	if err != nil {
+		return nil, nil, err
+	}
+	return findXMP(app1), findISO(app2), nil
+}

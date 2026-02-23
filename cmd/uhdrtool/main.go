@@ -61,6 +61,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  split  -in input.jpg -primary-out primary.jpg -gainmap-out gainmap.jpg [-meta-out meta.json]")
 	fmt.Fprintln(os.Stderr, "  join   -meta meta.json -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
 	fmt.Fprintln(os.Stderr, "        (or) join -template input.jpg -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
+	fmt.Fprintln(os.Stderr, "        (or) join -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
 	fmt.Fprintln(os.Stderr, "  gmstats -in gainmap.jpg")
 }
 
@@ -255,7 +256,28 @@ func runJoin(args []string) error {
 		return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
 	}
 	if *templatePath == "" {
-		return errors.New("missing -meta or -template")
+		secondaryXMP, secondaryISO, err := ultrahdr.ExtractGainmapMetadataSegments(gainmap)
+		if err != nil {
+			return err
+		}
+		if len(secondaryXMP) == 0 && len(secondaryISO) == 0 {
+			return errors.New("missing gainmap metadata (use -meta, -template, or embed XMP/ISO in gainmap)")
+		}
+		exif, icc, err := ultrahdr.ExtractEXIFAndICC(primary)
+		if err != nil {
+			return err
+		}
+		if len(exif) == 0 && len(icc) == 0 {
+			exif, icc, err = ultrahdr.ExtractEXIFAndICC(gainmap)
+			if err != nil {
+				return err
+			}
+		}
+		container, err := ultrahdr.AssembleContainer(primary, gainmap, exif, icc, secondaryXMP, secondaryISO)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
 	}
 	template, err := os.ReadFile(filepath.Clean(*templatePath))
 	if err != nil {
