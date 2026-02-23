@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"io"
 	"math"
 	"os"
 	"path/filepath"
@@ -27,7 +28,7 @@ type ResizeOptions struct {
 	GainmapOut    string
 }
 
-// ResizeSpec describes one output variant for ResizeJPEGBatch.
+// ResizeSpec describes one output variant for ResizeSDRBatch.
 type ResizeSpec struct {
 	Width         uint
 	Height        uint
@@ -102,10 +103,10 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 	return &res, nil
 }
 
-// ResizeJPEG resizes a regular JPEG to the requested dimensions using the built-in
+// ResizeSDR resizes a regular JPEG to the requested dimensions using the built-in
 // interpolation. When keepMeta is true, EXIF and ICC segments are preserved.
 // When keepMeta is false and input is a wide-gamut profile, output pixels are converted to sRGB.
-func ResizeJPEG(data []byte, width, height uint, quality int, interp Interpolation, keepMeta bool) ([]byte, error) {
+func ResizeSDR(r io.ReadCloser, width, height uint, quality int, interp Interpolation, keepMeta bool) ([]byte, error) {
 	var (
 		res []byte
 		err error
@@ -121,25 +122,34 @@ func ResizeJPEG(data []byte, width, height uint, quality int, interp Interpolati
 			err = e
 		},
 	}}
-	err = ResizeJPEGBatch(data, specs)
+	err = ResizeSDRBatch(r, specs)
 	if err != nil {
 		return nil, err
 	}
 	return res, err
 }
 
-// ResizeJPEGBatch resizes one JPEG into multiple outputs with a single source decode.
+// ResizeSDRBatch resizes one JPEG into multiple outputs with a single source decode.
 // For each spec: when KeepMeta is true EXIF/ICC are preserved; otherwise output is metadata-free.
 // Metadata-free outputs are converted to sRGB when source profile is recognized as wide gamut.
-func ResizeJPEGBatch(data []byte, specs []ResizeSpec) error {
+func ResizeSDRBatch(r io.ReadCloser, specs []ResizeSpec) error {
 	if len(specs) == 0 {
 		return errors.New("no resize specs provided")
 	}
+	if r == nil {
+		return errors.New("missing input reader")
+	}
+	defer r.Close()
 
 	for _, s := range specs {
 		if s.Width == 0 || s.Height == 0 {
 			return errors.New("invalid target dimensions")
 		}
+	}
+
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return err
 	}
 
 	srcProfile := colorProfile{gamut: colorGamutSRGB, transfer: colorTransferSRGB}

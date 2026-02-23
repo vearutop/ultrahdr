@@ -1,6 +1,8 @@
 package ultrahdr_test
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -41,15 +43,15 @@ func ExampleResizeUltraHDR() {
 	_, _ = ultrahdr.ResizeUltraHDR(data, 2400, 1600)
 }
 
-func ExampleResizeJPEG() {
+func ExampleResizeSDR() {
 	data, err := os.ReadFile(filepath.FromSlash("testdata/sample_srgb.jpg"))
 	if err != nil {
 		return
 	}
-	_, _ = ultrahdr.ResizeJPEG(data, 800, 600, 85, ultrahdr.InterpolationLanczos2, true)
+	_, _ = ultrahdr.ResizeSDR(io.NopCloser(bytes.NewReader(data)), 800, 600, 85, ultrahdr.InterpolationLanczos2, true)
 }
 
-func ExampleResizeJPEGBatch() {
+func ExampleResizeSDRBatch() {
 	data, err := os.ReadFile(filepath.FromSlash("testdata/sample_display_p3.jpg"))
 	if err != nil {
 		return
@@ -59,7 +61,7 @@ func ExampleResizeJPEGBatch() {
 		{Width: 600, Height: 400, Quality: 82, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(d []byte, err error) { _ = d }},
 		{Width: 300, Height: 200, Quality: 78, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(d []byte, err error) { _ = d }},
 	}
-	err = ultrahdr.ResizeJPEGBatch(data, specs)
+	err = ultrahdr.ResizeSDRBatch(io.NopCloser(bytes.NewReader(data)), specs)
 	if err != nil {
 		return
 	}

@@ -3,11 +3,12 @@ package ultrahdr
 import (
 	"bytes"
 	"image"
+	"io"
 	"os"
 	"testing"
 )
 
-func TestResizeJPEGBatchMatchesSingle(t *testing.T) {
+func TestResizeSDRBatchMatchesSingle(t *testing.T) {
 	data, err := os.ReadFile("testdata/sample_display_p3.jpg")
 	if err != nil {
 		t.Fatalf("read sample: %v", err)
@@ -34,23 +35,23 @@ func TestResizeJPEGBatchMatchesSingle(t *testing.T) {
 		{Width: 300, Height: 200, Quality: 92, Interpolation: InterpolationBilinear, KeepMeta: false, ReceiveResult: assertData},
 	}
 
-	err = ResizeJPEGBatch(data, specs)
+	err = ResizeSDRBatch(io.NopCloser(bytes.NewReader(data)), specs)
 	if err != nil {
 		t.Fatalf("batch resize: %v", err)
 	}
 }
 
-func TestResizeJPEGBatchInvalid(t *testing.T) {
+func TestResizeSDRBatchInvalid(t *testing.T) {
 	data, err := os.ReadFile("testdata/sample_srgb.jpg")
 	if err != nil {
 		t.Fatalf("read sample: %v", err)
 	}
 
-	if err := ResizeJPEGBatch(data, nil); err == nil {
+	if err := ResizeSDRBatch(io.NopCloser(bytes.NewReader(data)), nil); err == nil {
 		t.Fatal("expected error for empty specs")
 	}
 
-	if err := ResizeJPEGBatch(data, []ResizeSpec{{Width: 0, Height: 100, Quality: 80}}); err == nil {
+	if err := ResizeSDRBatch(io.NopCloser(bytes.NewReader(data)), []ResizeSpec{{Width: 0, Height: 100, Quality: 80}}); err == nil {
 		t.Fatal("expected error for zero width")
 	}
 }

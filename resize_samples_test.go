@@ -3,13 +3,14 @@ package ultrahdr
 import (
 	"bytes"
 	"image"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-func TestResizeJPEGSampleColorSpaces(t *testing.T) {
+func TestResizeSDRSampleColorSpaces(t *testing.T) {
 	samples, err := filepath.Glob(filepath.FromSlash("testdata/sample_*.jpg"))
 	if err != nil {
 		t.Fatalf("glob samples: %v", err)
@@ -37,11 +38,11 @@ func TestResizeJPEGSampleColorSpaces(t *testing.T) {
 				t.Fatalf("read sample: %v", err)
 			}
 
-			withoutMeta, err := ResizeJPEG(data, outW, outH, quality, InterpolationLanczos2, false)
+			withoutMeta, err := ResizeSDR(io.NopCloser(bytes.NewReader(data)), outW, outH, quality, InterpolationLanczos2, false)
 			if err != nil {
 				t.Fatalf("resize without meta: %v", err)
 			}
-			withMeta, err := ResizeJPEG(data, outW, outH, quality, InterpolationLanczos2, true)
+			withMeta, err := ResizeSDR(io.NopCloser(bytes.NewReader(data)), outW, outH, quality, InterpolationLanczos2, true)
 			if err != nil {
 				t.Fatalf("resize with meta: %v", err)
 			}

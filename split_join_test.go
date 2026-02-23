@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 )
 
-func BenchmarkResize(b *testing.B) {
+func BenchmarkResizeSDR(b *testing.B) {
 	j, err := os.ReadFile("testdata/small_uhdr.jpg")
 	if err != nil {
 		b.Fatal(err)
@@ -177,7 +178,7 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 	}
 }
 
-func TestResizeJPEGKeepMeta(t *testing.T) {
+func TestResizeSDRKeepMeta(t *testing.T) {
 	data, err := os.ReadFile("testdata/small_uhdr.jpg")
 	if err != nil {
 		t.Fatalf("read uhdr: %v", err)
@@ -194,7 +195,7 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 		t.Skip("primary jpeg has no exif/icc to verify")
 	}
 
-	noMeta, err := ResizeJPEG(split.Primary, 600, 400, 85, InterpolationBilinear, false)
+	noMeta, err := ResizeSDR(io.NopCloser(bytes.NewReader(split.Primary)), 600, 400, 85, InterpolationBilinear, false)
 	if err != nil {
 		t.Fatalf("resize jpeg no meta: %v", err)
 	}
@@ -206,7 +207,7 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 		t.Fatalf("unexpected metadata preserved")
 	}
 
-	withMeta, err := ResizeJPEG(split.Primary, 600, 400, 85, InterpolationBilinear, true)
+	withMeta, err := ResizeSDR(io.NopCloser(bytes.NewReader(split.Primary)), 600, 400, 85, InterpolationBilinear, true)
 	if err != nil {
 		t.Fatalf("resize jpeg keep meta: %v", err)
 	}
@@ -277,12 +278,12 @@ func TestResizeParallelNoRace(t *testing.T) {
 					t.Logf("%s worker=%d iter=%d ResizeUltraHDR=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
 				}
 				start = time.Now()
-				if _, err := ResizeJPEG(jpegData, uint(width), uint(height), 85, InterpolationLanczos2, false); err != nil {
+				if _, err := ResizeSDR(io.NopCloser(bytes.NewReader(jpegData)), uint(width), uint(height), 85, InterpolationLanczos2, false); err != nil {
 					errCh <- err
 					return
 				}
 				if testing.Verbose() {
-					t.Logf("%s worker=%d iter=%d ResizeJPEG=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
+					t.Logf("%s worker=%d iter=%d ResizeSDR=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
 				}
 			}
 			errCh <- nil
