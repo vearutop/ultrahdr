@@ -205,14 +205,14 @@ func runSplit(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*primaryOut), split.PrimaryJPEG, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Clean(*primaryOut), split.Primary, 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*gainmapOut), split.GainmapJPEG, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Clean(*gainmapOut), split.Gainmap, 0o644); err != nil {
 		return err
 	}
 	if *metaOut != "" {
-		bundle, err := ultrahdr.BuildMetadataBundle(split.PrimaryJPEG, split.Segs)
+		bundle, err := ultrahdr.BuildMetadataBundle(split.Primary, split.Segs)
 		if err != nil {
 			return err
 		}

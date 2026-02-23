@@ -102,22 +102,14 @@ func applyRebaseOptions(opts []RebaseOption) *RebaseOptions {
 	return cfg
 }
 
-// RebaseResult contains the rebased container and component JPEGs.
-type RebaseResult struct {
-	Container []byte
-	Primary   []byte
-	Gainmap   []byte
-	Meta      *GainMapMetadata
-}
-
 // Rebase replaces the primary SDR image while adjusting the gainmap
 // to preserve the original HDR reconstruction as closely as possible.
-func Rebase(data []byte, newSDR image.Image, opts ...RebaseOption) (*RebaseResult, error) {
+func Rebase(data []byte, newSDR image.Image, opts ...RebaseOption) (*Result, error) {
 	opt := applyRebaseOptions(opts)
 	return rebaseWithOptions(data, newSDR, opt)
 }
 
-func rebaseWithOptions(data []byte, newSDR image.Image, opt *RebaseOptions) (*RebaseResult, error) {
+func rebaseWithOptions(data []byte, newSDR image.Image, opt *RebaseOptions) (*Result, error) {
 	if newSDR == nil {
 		return nil, errors.New("new SDR image is nil")
 	}
@@ -128,11 +120,11 @@ func rebaseWithOptions(data []byte, newSDR image.Image, opt *RebaseOptions) (*Re
 	if split.Meta == nil {
 		return nil, errors.New("gainmap metadata missing")
 	}
-	oldSDR, _, err := image.Decode(bytes.NewReader(split.PrimaryJPEG))
+	oldSDR, _, err := image.Decode(bytes.NewReader(split.Primary))
 	if err != nil {
 		return nil, err
 	}
-	gainmapImg, _, err := image.Decode(bytes.NewReader(split.GainmapJPEG))
+	gainmapImg, _, err := image.Decode(bytes.NewReader(split.Gainmap))
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +132,7 @@ func rebaseWithOptions(data []byte, newSDR image.Image, opt *RebaseOptions) (*Re
 		return nil, errors.New("new SDR dimensions must match original")
 	}
 
-	_, oldICCSegs, err := extractExifAndIcc(split.PrimaryJPEG)
+	_, oldICCSegs, err := extractExifAndIcc(split.Primary)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +174,7 @@ func rebaseWithOptions(data []byte, newSDR image.Image, opt *RebaseOptions) (*Re
 		return nil, err
 	}
 	if len(exif) == 0 && len(icc) == 0 {
-		exif, icc, err = extractExifAndIcc(split.PrimaryJPEG)
+		exif, icc, err = extractExifAndIcc(split.Primary)
 		if err != nil {
 			return nil, err
 		}
@@ -198,7 +190,7 @@ func rebaseWithOptions(data []byte, newSDR image.Image, opt *RebaseOptions) (*Re
 	if err != nil {
 		return nil, err
 	}
-	return &RebaseResult{
+	return &Result{
 		Container: container,
 		Primary:   primaryOut,
 		Gainmap:   gainmapJpeg,
@@ -206,7 +198,7 @@ func rebaseWithOptions(data []byte, newSDR image.Image, opt *RebaseOptions) (*Re
 	}, nil
 }
 
-func rebaseUltraHDRFromHDR(newSDR image.Image, hdr *hdrImage, opt *RebaseOptions) (*RebaseResult, error) {
+func rebaseUltraHDRFromHDR(newSDR image.Image, hdr *hdrImage, opt *RebaseOptions) (*Result, error) {
 	if newSDR == nil || hdr == nil {
 		return nil, errors.New("missing SDR or HDR input")
 	}
@@ -238,7 +230,7 @@ func rebaseUltraHDRFromHDR(newSDR image.Image, hdr *hdrImage, opt *RebaseOptions
 	if err != nil {
 		return nil, err
 	}
-	return &RebaseResult{
+	return &Result{
 		Primary: primaryOut,
 		Gainmap: gainmapJpeg,
 		Meta:    meta,

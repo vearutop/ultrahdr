@@ -45,17 +45,17 @@ func BenchmarkResize(b *testing.B) {
 
 func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	var (
-		result *ResizeResult
-		split  *SplitResult
+		result *Result
+		split  *Result
 	)
 
 	// Use a known valid UltraHDR JPEG.
 	err := ResizeUltraHDRFile("testdata/small_uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
 		func(opts *ResizeOptions) {
-			opts.OnResult = func(res *ResizeResult) {
+			opts.OnResult = func(res *Result) {
 				result = res
 			}
-			opts.OnSplit = func(sr *SplitResult) {
+			opts.OnSplit = func(sr *Result) {
 				split = sr
 			}
 		})
@@ -88,8 +88,8 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("split after join: %v", err)
 	}
-	p2 := sr2.PrimaryJPEG
-	g2 := sr2.GainmapJPEG
+	p2 := sr2.Primary
+	g2 := sr2.Gainmap
 	meta2 := sr2.Meta
 
 	if len(p2) < 4 || p2[0] != 0xFF || p2[1] != 0xD8 || p2[len(p2)-2] != 0xFF || p2[len(p2)-1] != 0xD9 {
@@ -186,7 +186,7 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("split: %v", err)
 	}
-	exif, icc, err := extractExifAndIcc(split.PrimaryJPEG)
+	exif, icc, err := extractExifAndIcc(split.Primary)
 	if err != nil {
 		t.Fatalf("extract exif/icc: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 		t.Skip("primary jpeg has no exif/icc to verify")
 	}
 
-	noMeta, err := ResizeJPEG(split.PrimaryJPEG, 600, 400, 85, InterpolationBilinear, false)
+	noMeta, err := ResizeJPEG(split.Primary, 600, 400, 85, InterpolationBilinear, false)
 	if err != nil {
 		t.Fatalf("resize jpeg no meta: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 		t.Fatalf("unexpected metadata preserved")
 	}
 
-	withMeta, err := ResizeJPEG(split.PrimaryJPEG, 600, 400, 85, InterpolationBilinear, true)
+	withMeta, err := ResizeJPEG(split.Primary, 600, 400, 85, InterpolationBilinear, true)
 	if err != nil {
 		t.Fatalf("resize jpeg keep meta: %v", err)
 	}
@@ -249,7 +249,7 @@ func TestResizeParallelNoRace(t *testing.T) {
 		t.Fatalf("split: %v", err)
 	}
 
-	jpegData := sr.PrimaryJPEG
+	jpegData := sr.Primary
 
 	errCh := make(chan error, workers)
 	for i := 0; i < workers; i++ {

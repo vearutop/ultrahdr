@@ -2,28 +2,29 @@ package ultrahdr
 
 import "errors"
 
-// SplitResult contains the results of splitting an UltraHDR JPEG container.
-// It includes primary and gainmap JPEGs, parsed gainmap metadata, and raw metadata segments.
-type SplitResult struct {
-	PrimaryJPEG, GainmapJPEG []byte
-	Meta                     *GainMapMetadata
-	Segs                     *MetadataSegments
+// Result contains the primary/gainmap JPEGs with optional container and metadata.
+type Result struct {
+	Container []byte
+	Primary   []byte
+	Gainmap   []byte
+	Meta      *GainMapMetadata
+	Segs      *MetadataSegments
 }
 
 // Split extracts primary/gainmap JPEGs, metadata, and raw XMP/ISO segments.
-func Split(data []byte) (*SplitResult, error) {
+func Split(data []byte) (*Result, error) {
 	ranges, err := scanJPEGs(data)
 	if err != nil {
 		return nil, err
 	}
 
-	res := SplitResult{}
+	res := Result{}
 
 	if len(ranges) < 2 {
 		return nil, errors.New("gainmap image not found")
 	}
-	res.PrimaryJPEG = append([]byte(nil), data[ranges[0][0]:ranges[0][1]]...)
-	res.GainmapJPEG = append([]byte(nil), data[ranges[1][0]:ranges[1][1]]...)
+	res.Primary = append([]byte(nil), data[ranges[0][0]:ranges[0][1]]...)
+	res.Gainmap = append([]byte(nil), data[ranges[1][0]:ranges[1][1]]...)
 
 	res.Segs = &MetadataSegments{}
 	hApp1, hApp2, err := extractContainerHeaderSegments(data)
@@ -33,7 +34,7 @@ func Split(data []byte) (*SplitResult, error) {
 	res.Segs.PrimaryXMP = findXMP(hApp1)
 	res.Segs.PrimaryISO = findISO(hApp2)
 
-	gApp1, gApp2, err := extractAppSegments(res.GainmapJPEG)
+	gApp1, gApp2, err := extractAppSegments(res.Gainmap)
 	if err != nil {
 		return nil, err
 	}
@@ -60,9 +61,9 @@ func Split(data []byte) (*SplitResult, error) {
 
 // Join assembles a JPEG/R container using raw metadata segments.
 // PrimaryXMP is updated to reflect the new gainmap length.
-func (sr SplitResult) Join() ([]byte, error) {
+func (sr Result) Join() ([]byte, error) {
 	if sr.Segs == nil {
 		return nil, errors.New("segments required")
 	}
-	return assembleContainerWithSegments(sr.PrimaryJPEG, sr.GainmapJPEG, sr.Segs)
+	return assembleContainerWithSegments(sr.Primary, sr.Gainmap, sr.Segs)
 }

@@ -26,11 +26,11 @@ func ExampleSplit_joinWithBundle() {
 	if err != nil {
 		return
 	}
-	bundle, err := ultrahdr.BuildMetadataBundle(sr.PrimaryJPEG, sr.Segs)
+	bundle, err := ultrahdr.BuildMetadataBundle(sr.Primary, sr.Segs)
 	if err != nil {
 		return
 	}
-	_, _ = ultrahdr.AssembleFromBundle(sr.PrimaryJPEG, sr.GainmapJPEG, bundle)
+	_, _ = ultrahdr.AssembleFromBundle(sr.Primary, sr.Gainmap, bundle)
 }
 
 func ExampleResizeUltraHDR() {

@@ -21,17 +21,10 @@ type ResizeOptions struct {
 	// Interpolation selects the built-in interpolation mode for the primary image and gainmap
 	// when Resize is nil.
 	Interpolation Interpolation
-	OnResult      func(res *ResizeResult)
-	OnSplit       func(sr *SplitResult)
+	OnResult      func(res *Result)
+	OnSplit       func(sr *Result)
 	PrimaryOut    string
 	GainmapOut    string
-}
-
-// ResizeResult contains the resized container and its component JPEGs.
-type ResizeResult struct {
-	Container []byte
-	Primary   []byte
-	Gainmap   []byte
 }
 
 // ResizeSpec describes one output variant for ResizeJPEGBatch.
@@ -46,7 +39,7 @@ type ResizeSpec struct {
 
 // ResizeUltraHDR resizes an UltraHDR JPEG container to the requested dimensions.
 // It returns the new container and the resized primary/gainmap JPEGs.
-func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptions)) (*ResizeResult, error) {
+func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptions)) (*Result, error) {
 	if width <= 0 || height <= 0 {
 		return nil, errors.New("invalid target dimensions")
 	}
@@ -72,15 +65,15 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 		opt.OnSplit(sr)
 	}
 
-	primaryThumb, err := resizeJPEG(sr.PrimaryJPEG, width, height, nil, opt.PrimaryQuality, opt.Interpolation)
+	primaryThumb, err := resizeJPEG(sr.Primary, width, height, nil, opt.PrimaryQuality, opt.Interpolation)
 	if err != nil {
 		return nil, fmt.Errorf("resize primary: %w", err)
 	}
-	gainmapThumb, err := resizeGainmapJPEG(sr.GainmapJPEG, width, height, nil, opt.GainmapQuality, sr.Meta, opt.Interpolation)
+	gainmapThumb, err := resizeGainmapJPEG(sr.Gainmap, width, height, nil, opt.GainmapQuality, sr.Meta, opt.Interpolation)
 	if err != nil {
 		return nil, fmt.Errorf("resize gainmap: %w", err)
 	}
-	exif, icc, err := extractExifAndIcc(sr.PrimaryJPEG)
+	exif, icc, err := extractExifAndIcc(sr.Primary)
 	if err != nil {
 		return nil, fmt.Errorf("extract exif and icc: %w", err)
 	}
@@ -96,7 +89,7 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 		return nil, fmt.Errorf("assemble container: %w", err)
 	}
 
-	res := ResizeResult{
+	res := Result{
 		Container: container,
 		Primary:   primaryThumb,
 		Gainmap:   gainmapThumb,
