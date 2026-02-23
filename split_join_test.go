@@ -171,14 +171,24 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 	defer f.Close()
 	resized, err := ResizeHDR(f, 300, 200, func(opts *ResizeOptions) {
 		opts.Interpolation = interp
-		opts.PrimaryOut = primary
-		opts.GainmapOut = gainmap
 	})
-	if err == nil {
-		err = os.WriteFile(container, resized.Container, 0o644)
-	}
 	if err != nil {
 		t.Fatalf("resize %s: %v", name, err)
+	}
+
+	err = os.WriteFile(container, resized.Container, 0o644)
+	if err != nil {
+		t.Fatalf("write %s: %v", container, err)
+	}
+
+	err = os.WriteFile(primary, resized.Primary, 0o644)
+	if err != nil {
+		t.Fatalf("write %s: %v", primary, err)
+	}
+
+	err = os.WriteFile(gainmap, resized.Gainmap, 0o644)
+	if err != nil {
+		t.Fatalf("write %s: %v", gainmap, err)
 	}
 }
 

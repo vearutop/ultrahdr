@@ -15,14 +15,12 @@ import (
 
 // ResizeOptions controls the UltraHDR resize behavior.
 type ResizeOptions struct {
-	PrimaryQuality int
+	Quality        int
 	GainmapQuality int
 	// Interpolation selects the built-in interpolation mode for the primary image and gainmap
 	// when Resize is nil.
 	Interpolation Interpolation
 	OnSplit       func(sr *Result)
-	PrimaryOut    string
-	GainmapOut    string
 }
 
 // ResizeSpec describes one output variant for ResizeSDRBatch.
@@ -50,20 +48,23 @@ func ResizeHDR(r io.Reader, width, height uint, opts ...func(o *ResizeOptions)) 
 	}
 
 	opt := ResizeOptions{
-		PrimaryQuality: 85,
-		GainmapQuality: 75,
-		Interpolation:  InterpolationNearest,
+		Quality:       defaultPrimaryQuality,
+		Interpolation: InterpolationNearest,
 	}
 
 	for _, applyOpt := range opts {
 		applyOpt(&opt)
 	}
 
+	if opt.GainmapQuality == 0 {
+		opt.GainmapQuality = opt.Quality
+	}
+
 	if opt.OnSplit != nil {
 		opt.OnSplit(sr)
 	}
 
-	primaryThumb, err := resizeJPEG(sr.Primary, width, height, nil, opt.PrimaryQuality, opt.Interpolation)
+	primaryThumb, err := resizeJPEG(sr.Primary, width, height, nil, opt.Quality, opt.Interpolation)
 	if err != nil {
 		return nil, fmt.Errorf("resize primary: %w", err)
 	}

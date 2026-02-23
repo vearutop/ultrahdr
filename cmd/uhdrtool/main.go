@@ -88,10 +88,8 @@ func runResize(args []string) error {
 	}
 	defer f.Close()
 	resized, err := ultrahdr.ResizeHDR(f, *width, *height, func(opt *ultrahdr.ResizeOptions) {
-		opt.PrimaryQuality = *q
+		opt.Quality = *q
 		opt.GainmapQuality = *gq
-		opt.PrimaryOut = *primaryOut
-		opt.GainmapOut = *gainmapOut
 
 		interpMode := ultrahdr.InterpolationNearest
 		switch *interp {
