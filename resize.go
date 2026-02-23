@@ -41,6 +41,22 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 	if sr.Segs == nil {
 		return errors.New("metadata segments missing")
 	}
+	primaryImg, _, err := image.Decode(bytes.NewReader(sr.Primary))
+	if err != nil {
+		return fmt.Errorf("decode primary: %w", err)
+	}
+	gainmapImg, _, err := image.Decode(bytes.NewReader(sr.Gainmap))
+	if err != nil {
+		return fmt.Errorf("decode gainmap: %w", err)
+	}
+	if sr.Meta == nil {
+		return errors.New("gainmap metadata missing")
+	}
+	srcW := primaryImg.Bounds().Dx()
+	srcH := primaryImg.Bounds().Dy()
+	if srcW <= 0 || srcH <= 0 {
+		return errors.New("invalid source dimensions")
+	}
 	for _, spec := range specs {
 		if spec.ReceiveSplit != nil {
 			spec.ReceiveSplit(sr)
@@ -60,8 +76,8 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 	}
 
 	for _, spec := range specs {
-		if spec.Width == 0 || spec.Height == 0 {
-			err := errors.New("invalid target dimensions")
+		width, height, err := resolveResizeDims(spec, srcW, srcH)
+		if err != nil {
 			if spec.ReceiveResult != nil {
 				spec.ReceiveResult(nil, err)
 			}
@@ -83,14 +99,16 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 			interp = spec.Interpolation
 		}
 
-		primaryThumb, err := resizeJPEG(sr.Primary, spec.Width, spec.Height, nil, primaryQuality, interp)
+		primaryThumbImg := resizeImageInterpolated(primaryImg, int(width), int(height), interp)
+		primaryThumb, err := encodeWithQuality(primaryThumbImg, primaryQuality)
 		if err != nil {
 			if spec.ReceiveResult != nil {
 				spec.ReceiveResult(nil, err)
 			}
 			return fmt.Errorf("resize primary: %w", err)
 		}
-		gainmapThumb, err := resizeGainmapJPEG(sr.Gainmap, spec.Width, spec.Height, nil, gainmapQuality, sr.Meta, interp)
+		gainmapThumbImg := resizeImageInterpolated(gainmapImg, int(width), int(height), interp)
+		gainmapThumb, err := encodeWithQuality(gainmapThumbImg, gainmapQuality)
 		if err != nil {
 			if spec.ReceiveResult != nil {
 				spec.ReceiveResult(nil, err)
@@ -151,6 +169,11 @@ func ResizeSDR(r io.Reader, specs ...ResizeSpec) error {
 	if err != nil {
 		return err
 	}
+	srcW := srcImg.Bounds().Dx()
+	srcH := srcImg.Bounds().Dy()
+	if srcW <= 0 || srcH <= 0 {
+		return errors.New("invalid source dimensions")
+	}
 
 	type resizedKey struct {
 		w      int
@@ -167,7 +190,17 @@ func ResizeSDR(r io.Reader, specs ...ResizeSpec) error {
 	convertedCache := map[convertedKey]image.Image{}
 
 	for _, spec := range specs {
-		rk := resizedKey{w: int(spec.Width), h: int(spec.Height), interp: spec.Interpolation}
+		width, height, err := resolveResizeDims(spec, srcW, srcH)
+		if err != nil {
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return err
+		}
+		if spec.Quality <= 0 {
+			spec.Quality = defaultPrimaryQuality
+		}
+		rk := resizedKey{w: int(width), h: int(height), interp: spec.Interpolation}
 		resized, ok := resizedCache[rk]
 		if !ok {
 			resized = resizeImageInterpolated(srcImg, rk.w, rk.h, rk.interp)
@@ -215,6 +248,30 @@ func ResizeSDR(r io.Reader, specs ...ResizeSpec) error {
 	return nil
 }
 
+func resolveResizeDims(spec ResizeSpec, srcW, srcH int) (uint, uint, error) {
+	if srcW <= 0 || srcH <= 0 {
+		return 0, 0, errors.New("invalid source dimensions")
+	}
+	if spec.Width == 0 && spec.Height == 0 {
+		return 0, 0, errors.New("invalid target dimensions")
+	}
+	if spec.Width == 0 {
+		w := int(math.Round(float64(spec.Height) * float64(srcW) / float64(srcH)))
+		if w <= 0 {
+			return 0, 0, errors.New("invalid target dimensions")
+		}
+		return uint(w), spec.Height, nil
+	}
+	if spec.Height == 0 {
+		h := int(math.Round(float64(spec.Width) * float64(srcH) / float64(srcW)))
+		if h <= 0 {
+			return 0, 0, errors.New("invalid target dimensions")
+		}
+		return spec.Width, uint(h), nil
+	}
+	return spec.Width, spec.Height, nil
+}
+
 // Interpolation selects the built-in interpolation mode.
 type Interpolation int
 
@@ -232,50 +289,6 @@ const (
 	// InterpolationLanczos3 is Lanczos sampling with a=3.
 	InterpolationLanczos3
 )
-
-func resizeJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, interp Interpolation) ([]byte, error) {
-	srgbProfile := colorProfile{gamut: colorGamutSRGB, transfer: colorTransferSRGB}
-	return resizeJPEGWithProfile(jpegData, w, h, segs, quality, interp, srgbProfile, srgbProfile)
-}
-
-func resizeJPEGWithProfile(jpegData []byte, w, h uint, segs []appSegment, quality int, interp Interpolation, srcProfile, dstProfile colorProfile) ([]byte, error) {
-	img, _, err := image.Decode(bytes.NewReader(jpegData))
-	if err != nil {
-		return nil, err
-	}
-	outImg := resizeImageInterpolated(img, int(w), int(h), interp)
-	if srcProfile != dstProfile {
-		outImg = convertImageProfile(outImg, srcProfile, dstProfile)
-	}
-
-	out, err := encodeWithQuality(outImg, quality)
-	if err != nil {
-		return nil, err
-	}
-	if len(segs) > 0 {
-		return insertAppSegments(out, segs)
-	}
-	return out, nil
-}
-
-func resizeGainmapJPEG(jpegData []byte, w, h uint, segs []appSegment, quality int, meta *GainMapMetadata, interp Interpolation) ([]byte, error) {
-	img, _, err := image.Decode(bytes.NewReader(jpegData))
-	if err != nil {
-		return nil, err
-	}
-	if meta == nil {
-		return nil, errors.New("gainmap metadata missing")
-	}
-	outImg := resizeImageInterpolated(img, int(w), int(h), interp)
-	out, err := encodeWithQuality(outImg, quality)
-	if err != nil {
-		return nil, err
-	}
-	if len(segs) > 0 {
-		return insertAppSegments(out, segs)
-	}
-	return out, nil
-}
 
 func resizeImageInterpolated(img image.Image, w, h int, interp Interpolation) image.Image {
 	switch src := img.(type) {
