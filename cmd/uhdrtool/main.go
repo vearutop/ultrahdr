@@ -123,9 +123,18 @@ func runRebase(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	opts := &ultrahdr.RebaseOptions{
-		BaseQuality:    *q,
-		GainmapQuality: *gq,
+	var opts []ultrahdr.RebaseOption
+	if *q > 0 {
+		opts = append(opts, ultrahdr.WithBaseQuality(*q))
+	}
+	if *gq > 0 {
+		opts = append(opts, ultrahdr.WithGainmapQuality(*gq))
+	}
+	if *primaryOut != "" {
+		opts = append(opts, ultrahdr.WithPrimaryOut(*primaryOut))
+	}
+	if *gainmapOut != "" {
+		opts = append(opts, ultrahdr.WithGainmapOut(*gainmapOut))
 	}
 	if *exrPath != "" && *tiffPath != "" {
 		return errors.New("use only one of -exr or -tiff")
@@ -134,18 +143,18 @@ func runRebase(args []string) error {
 		if *primaryPath == "" || *outPath == "" {
 			return errors.New("missing required arguments")
 		}
-		return ultrahdr.RebaseUltraHDRFromEXRFile(*primaryPath, *exrPath, *outPath, opts, *primaryOut, *gainmapOut)
+		return ultrahdr.RebaseFromEXRFile(*primaryPath, *exrPath, *outPath, opts...)
 	}
 	if *tiffPath != "" {
 		if *primaryPath == "" || *outPath == "" {
 			return errors.New("missing required arguments")
 		}
-		return ultrahdr.RebaseUltraHDRFromTIFFFile(*primaryPath, *tiffPath, *outPath, opts, *primaryOut, *gainmapOut)
+		return ultrahdr.RebaseFromTIFFFile(*primaryPath, *tiffPath, *outPath, opts...)
 	}
 	if *inPath == "" || *primaryPath == "" || *outPath == "" {
 		return errors.New("missing required arguments")
 	}
-	return ultrahdr.RebaseUltraHDRFile(*inPath, *primaryPath, *outPath, opts, *primaryOut, *gainmapOut)
+	return ultrahdr.RebaseFile(*inPath, *primaryPath, *outPath, opts...)
 }
 
 func runDetect(args []string) error {
