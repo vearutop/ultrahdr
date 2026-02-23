@@ -13,30 +13,22 @@ import (
 	"github.com/vearutop/ultrahdr/internal/jpegx"
 )
 
-// ResizeOptions controls the UltraHDR resize behavior.
-type ResizeOptions struct {
-	Quality        int
-	GainmapQuality int
-	// Interpolation selects the built-in interpolation mode for the primary image and gainmap
-	// when Resize is nil.
-	Interpolation Interpolation
-	OnSplit       func(sr *Result)
-}
-
-// ResizeSpec describes one output variant for ResizeSDRBatch.
+// ResizeSpec describes one output variant for ResizeSDRBatch and options for ResizeHDR.
 type ResizeSpec struct {
-	Width         uint
-	Height        uint
-	Quality       int
-	Interpolation Interpolation
-	KeepMeta      bool
-	ReceiveResult func(res *Result, err error)
+	Width          uint                         // Target width in pixels.
+	Height         uint                         // Target height in pixels.
+	Quality        int                          // SDR/primary JPEG quality (0 uses default).
+	GainmapQuality int                          // Gainmap JPEG quality for HDR resize (0 uses default or Quality).
+	Interpolation  Interpolation                // Resize interpolation mode for SDR and HDR paths.
+	KeepMeta       bool                         // SDR-only: preserve EXIF/ICC and skip sRGB conversion when true.
+	ReceiveResult  func(res *Result, err error) // SDR-only: callback for ResizeSDRBatch outputs.
+	ReceiveSplit   func(sr *Result)             // HDR-only: callback with split result before resizing.
 }
 
 // ResizeHDR resizes an UltraHDR JPEG container to the requested dimensions.
 // It returns the new container and the resized primary/gainmap JPEGs.
-func ResizeHDR(r io.Reader, width, height uint, opts ...func(o *ResizeOptions)) (*Result, error) {
-	if width <= 0 || height <= 0 {
+func ResizeHDR(r io.Reader, spec ResizeSpec) (*Result, error) {
+	if spec.Width == 0 || spec.Height == 0 {
 		return nil, errors.New("invalid target dimensions")
 	}
 	sr, err := Split(r)
@@ -47,28 +39,30 @@ func ResizeHDR(r io.Reader, width, height uint, opts ...func(o *ResizeOptions)) 
 		return nil, errors.New("metadata segments missing")
 	}
 
-	opt := ResizeOptions{
-		Quality:       defaultPrimaryQuality,
-		Interpolation: InterpolationNearest,
+	primaryQuality := defaultPrimaryQuality
+	gainmapQuality := defaultGainMapQuality
+	interp := InterpolationNearest
+	if spec.Quality > 0 {
+		primaryQuality = spec.Quality
+	}
+	if spec.GainmapQuality > 0 {
+		gainmapQuality = spec.GainmapQuality
+	} else if spec.Quality > 0 {
+		gainmapQuality = spec.Quality
+	}
+	if spec.Interpolation != 0 {
+		interp = spec.Interpolation
 	}
 
-	for _, applyOpt := range opts {
-		applyOpt(&opt)
+	if spec.ReceiveSplit != nil {
+		spec.ReceiveSplit(sr)
 	}
 
-	if opt.GainmapQuality == 0 {
-		opt.GainmapQuality = opt.Quality
-	}
-
-	if opt.OnSplit != nil {
-		opt.OnSplit(sr)
-	}
-
-	primaryThumb, err := resizeJPEG(sr.Primary, width, height, nil, opt.Quality, opt.Interpolation)
+	primaryThumb, err := resizeJPEG(sr.Primary, spec.Width, spec.Height, nil, primaryQuality, interp)
 	if err != nil {
 		return nil, fmt.Errorf("resize primary: %w", err)
 	}
-	gainmapThumb, err := resizeGainmapJPEG(sr.Gainmap, width, height, nil, opt.GainmapQuality, sr.Meta, opt.Interpolation)
+	gainmapThumb, err := resizeGainmapJPEG(sr.Gainmap, spec.Width, spec.Height, nil, gainmapQuality, sr.Meta, interp)
 	if err != nil {
 		return nil, fmt.Errorf("resize gainmap: %w", err)
 	}
@@ -93,7 +87,6 @@ func ResizeHDR(r io.Reader, width, height uint, opts ...func(o *ResizeOptions)) 
 		Primary:   primaryThumb,
 		Gainmap:   gainmapThumb,
 	}
-
 	return &res, nil
 }
 

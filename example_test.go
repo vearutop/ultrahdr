@@ -39,7 +39,7 @@ func ExampleResizeHDR() {
 		return
 	}
 	defer f.Close()
-	_, _ = ultrahdr.ResizeHDR(f, 2400, 1600)
+	_, _ = ultrahdr.ResizeHDR(f, ultrahdr.ResizeSpec{Width: 2400, Height: 1600})
 }
 
 func ExampleResizeSDR() {

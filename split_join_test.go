@@ -31,8 +31,10 @@ func BenchmarkResizeSDR(b *testing.B) {
 		b.Run(bench.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				_, err := ResizeHDR(bytes.NewReader(j), 300, 200, func(opts *ResizeOptions) {
-					opts.Interpolation = bench.interp
+				_, err := ResizeHDR(bytes.NewReader(j), ResizeSpec{
+					Width:         300,
+					Height:        200,
+					Interpolation: bench.interp,
 				})
 				if err != nil {
 					b.Fatal(err)
@@ -54,10 +56,12 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 		t.Fatalf("open uhdr: %v", err)
 	}
 	defer f.Close()
-	result, err = ResizeHDR(f, 2400, 1600, func(opts *ResizeOptions) {
-		opts.OnSplit = func(sr *Result) {
+	result, err = ResizeHDR(f, ResizeSpec{
+		Width:  2400,
+		Height: 1600,
+		ReceiveSplit: func(sr *Result) {
 			split = sr
-		}
+		},
 	})
 	if err != nil {
 		t.Fatalf("resize uhdr: %v", err)
@@ -169,8 +173,10 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 		t.Fatalf("open uhdr: %v", err)
 	}
 	defer f.Close()
-	resized, err := ResizeHDR(f, 300, 200, func(opts *ResizeOptions) {
-		opts.Interpolation = interp
+	resized, err := ResizeHDR(f, ResizeSpec{
+		Width:         300,
+		Height:        200,
+		Interpolation: interp,
 	})
 	if err != nil {
 		t.Fatalf("resize %s: %v", name, err)
@@ -275,15 +281,17 @@ func TestResizeParallelNoRace(t *testing.T) {
 					t.Logf("%s worker=%d iter=%d", time.Now().Format(time.RFC3339Nano), idx, j)
 				}
 				start := time.Now()
-				_, err := ResizeHDR(bytes.NewReader(data), uint(width), uint(height), func(opts *ResizeOptions) {
-					switch (idx + j) % 3 {
-					case 0:
-						opts.Interpolation = InterpolationBilinear
-					case 1:
-						opts.Interpolation = InterpolationMitchellNetravali
-					default:
-						opts.Interpolation = InterpolationLanczos3
-					}
+				interp := InterpolationLanczos3
+				switch (idx + j) % 3 {
+				case 0:
+					interp = InterpolationBilinear
+				case 1:
+					interp = InterpolationMitchellNetravali
+				}
+				_, err := ResizeHDR(bytes.NewReader(data), ResizeSpec{
+					Width:         uint(width),
+					Height:        uint(height),
+					Interpolation: interp,
 				})
 				if err != nil {
 					errCh <- err

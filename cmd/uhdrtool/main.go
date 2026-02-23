@@ -87,26 +87,27 @@ func runResize(args []string) error {
 		return err
 	}
 	defer f.Close()
-	resized, err := ultrahdr.ResizeHDR(f, *width, *height, func(opt *ultrahdr.ResizeOptions) {
-		opt.Quality = *q
-		opt.GainmapQuality = *gq
-
-		interpMode := ultrahdr.InterpolationNearest
-		switch *interp {
-		case "nearest":
-			interpMode = ultrahdr.InterpolationNearest
-		case "bilinear":
-			interpMode = ultrahdr.InterpolationBilinear
-		case "bicubic":
-			interpMode = ultrahdr.InterpolationBicubic
-		case "mitchell":
-			interpMode = ultrahdr.InterpolationMitchellNetravali
-		case "lanczos2":
-			interpMode = ultrahdr.InterpolationLanczos2
-		case "lanczos3":
-			interpMode = ultrahdr.InterpolationLanczos3
-		}
-		opt.Interpolation = interpMode
+	interpMode := ultrahdr.InterpolationNearest
+	switch *interp {
+	case "nearest":
+		interpMode = ultrahdr.InterpolationNearest
+	case "bilinear":
+		interpMode = ultrahdr.InterpolationBilinear
+	case "bicubic":
+		interpMode = ultrahdr.InterpolationBicubic
+	case "mitchell":
+		interpMode = ultrahdr.InterpolationMitchellNetravali
+	case "lanczos2":
+		interpMode = ultrahdr.InterpolationLanczos2
+	case "lanczos3":
+		interpMode = ultrahdr.InterpolationLanczos3
+	}
+	resized, err := ultrahdr.ResizeHDR(f, ultrahdr.ResizeSpec{
+		Width:          *width,
+		Height:         *height,
+		Quality:        *q,
+		GainmapQuality: *gq,
+		Interpolation:  interpMode,
 	})
 	if err != nil {
 		return err
