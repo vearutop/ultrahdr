@@ -7,7 +7,6 @@ import (
 	"image/color"
 	"math"
 	"os"
-	"path/filepath"
 )
 
 // RebaseOptions controls gainmap rebase behavior.
@@ -239,7 +238,7 @@ func rebaseUltraHDRFromHDR(newSDR image.Image, hdr *hdrImage, opt *RebaseOptions
 
 // RebaseFile reads an UltraHDR JPEG, rebases it on newSDRPath, and writes the output.
 func RebaseFile(inPath, newSDRPath, outPath string, opts ...RebaseOption) error {
-	data, err := os.ReadFile(filepath.Clean(inPath))
+	data, err := os.ReadFile(inPath)
 	if err != nil {
 		return err
 	}
@@ -434,7 +433,7 @@ func rebaseUltraHDRFromHDRFile(primaryPath, hdrPath, outPath string, decodeHDR f
 	if err != nil {
 		return err
 	}
-	hdrBytes, err := os.ReadFile(filepath.Clean(hdrPath))
+	hdrBytes, err := os.ReadFile(hdrPath)
 	if err != nil {
 		return err
 	}
@@ -474,7 +473,7 @@ func rebaseUltraHDRFromHDRFile(primaryPath, hdrPath, outPath string, decodeHDR f
 }
 
 func loadImageWithICC(path string) (image.Image, []byte, []byte, error) {
-	data, err := os.ReadFile(filepath.Clean(path))
+	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -490,16 +489,16 @@ func loadImageWithICC(path string) (image.Image, []byte, []byte, error) {
 }
 
 func writeRebaseOutputs(outPath string, container []byte, primaryOut string, primary []byte, gainmapOut string, gainmap []byte) error {
-	if err := os.WriteFile(filepath.Clean(outPath), container, 0o644); err != nil {
+	if err := os.WriteFile(outPath, container, 0o644); err != nil {
 		return err
 	}
 	if primaryOut != "" {
-		if err := os.WriteFile(filepath.Clean(primaryOut), primary, 0o644); err != nil {
+		if err := os.WriteFile(primaryOut, primary, 0o644); err != nil {
 			return err
 		}
 	}
 	if gainmapOut != "" {
-		if err := os.WriteFile(filepath.Clean(gainmapOut), gainmap, 0o644); err != nil {
+		if err := os.WriteFile(gainmapOut, gainmap, 0o644); err != nil {
 			return err
 		}
 	}

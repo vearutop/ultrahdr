@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
@@ -83,7 +82,7 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("repack join: %v", err)
 	}
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_repacked.jpg"), repacked, 0o644); err != nil {
+	if err := os.WriteFile("testdata/uhdr_repacked.jpg", repacked, 0o644); err != nil {
 		t.Fatalf("write uhdr_repacked.jpg: %v", err)
 	}
 
@@ -105,7 +104,7 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 		t.Fatalf("metadata missing")
 	}
 	// Compare marker sequence and MPF offsets against vips output.
-	vipsData, err := os.ReadFile(filepath.FromSlash("testdata/uhdr.vips_thumb.jpg"))
+	vipsData, err := os.ReadFile("testdata/uhdr.vips_thumb.jpg")
 	if err != nil {
 		t.Fatalf("read uhdr.vips_thumb.jpg: %v", err)
 	}

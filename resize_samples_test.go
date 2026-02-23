@@ -10,7 +10,7 @@ import (
 )
 
 func TestResizeSDRSampleColorSpaces(t *testing.T) {
-	samples, err := filepath.Glob(filepath.FromSlash("testdata/sample_*.jpg"))
+	samples, err := filepath.Glob("testdata/sample_*.jpg")
 	if err != nil {
 		t.Fatalf("glob samples: %v", err)
 	}
@@ -18,7 +18,7 @@ func TestResizeSDRSampleColorSpaces(t *testing.T) {
 		t.Skip("no sample_* files found")
 	}
 
-	outDir := filepath.FromSlash("testdata/generated")
+	outDir := "testdata/generated"
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		t.Fatalf("mkdir out dir: %v", err)
 	}

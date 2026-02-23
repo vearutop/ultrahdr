@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"image"
 	"os"
-	"path/filepath"
 
 	"github.com/vearutop/ultrahdr"
 )
@@ -83,7 +82,7 @@ func runResize(args []string) error {
 	if *inPath == "" || *outPath == "" || *width <= 0 || *height <= 0 {
 		return errors.New("missing required arguments")
 	}
-	f, err := os.Open(filepath.Clean(*inPath))
+	f, err := os.Open(*inPath)
 	if err != nil {
 		return err
 	}
@@ -114,16 +113,16 @@ func runResize(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*outPath), resized.Container, 0o644); err != nil {
+	if err := os.WriteFile(*outPath, resized.Container, 0o644); err != nil {
 		return err
 	}
 	if *primaryOut != "" {
-		if err := os.WriteFile(filepath.Clean(*primaryOut), resized.Primary, 0o644); err != nil {
+		if err := os.WriteFile(*primaryOut, resized.Primary, 0o644); err != nil {
 			return err
 		}
 	}
 	if *gainmapOut != "" {
-		if err := os.WriteFile(filepath.Clean(*gainmapOut), resized.Gainmap, 0o644); err != nil {
+		if err := os.WriteFile(*gainmapOut, resized.Gainmap, 0o644); err != nil {
 			return err
 		}
 	}
@@ -189,7 +188,7 @@ func runDetect(args []string) error {
 	if *inPath == "" {
 		return errors.New("missing required arguments")
 	}
-	f, err := os.Open(filepath.Clean(*inPath))
+	f, err := os.Open(*inPath)
 	if err != nil {
 		return err
 	}
@@ -219,7 +218,7 @@ func runSplit(args []string) error {
 	if *inPath == "" || *primaryOut == "" || *gainmapOut == "" {
 		return errors.New("missing required arguments")
 	}
-	f, err := os.Open(filepath.Clean(*inPath))
+	f, err := os.Open(*inPath)
 	if err != nil {
 		return err
 	}
@@ -228,10 +227,10 @@ func runSplit(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*primaryOut), split.Primary, 0o644); err != nil {
+	if err := os.WriteFile(*primaryOut, split.Primary, 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*gainmapOut), split.Gainmap, 0o644); err != nil {
+	if err := os.WriteFile(*gainmapOut, split.Gainmap, 0o644); err != nil {
 		return err
 	}
 	if *metaOut != "" {
@@ -243,7 +242,7 @@ func runSplit(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Clean(*metaOut), payload, 0o644); err != nil {
+		if err := os.WriteFile(*metaOut, payload, 0o644); err != nil {
 			return err
 		}
 	}
@@ -264,16 +263,16 @@ func runJoin(args []string) error {
 	if *primaryPath == "" || *gainmapPath == "" || *outPath == "" {
 		return errors.New("missing required arguments")
 	}
-	primary, err := os.ReadFile(filepath.Clean(*primaryPath))
+	primary, err := os.ReadFile(*primaryPath)
 	if err != nil {
 		return err
 	}
-	gainmap, err := os.ReadFile(filepath.Clean(*gainmapPath))
+	gainmap, err := os.ReadFile(*gainmapPath)
 	if err != nil {
 		return err
 	}
 	if *metaPath != "" {
-		metaData, err := os.ReadFile(filepath.Clean(*metaPath))
+		metaData, err := os.ReadFile(*metaPath)
 		if err != nil {
 			return err
 		}
@@ -285,7 +284,7 @@ func runJoin(args []string) error {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
+		return os.WriteFile(*outPath, container, 0o644)
 	}
 	if *templatePath == "" {
 		secondaryXMP, secondaryISO, err := ultrahdr.ExtractGainmapMetadataSegments(gainmap)
@@ -309,9 +308,9 @@ func runJoin(args []string) error {
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
+		return os.WriteFile(*outPath, container, 0o644)
 	}
-	template, err := os.Open(filepath.Clean(*templatePath))
+	template, err := os.Open(*templatePath)
 	if err != nil {
 		return err
 	}
@@ -334,7 +333,7 @@ func runJoin(args []string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
+	return os.WriteFile(*outPath, container, 0o644)
 }
 
 func runGainmapStats(args []string) error {
@@ -347,7 +346,7 @@ func runGainmapStats(args []string) error {
 	if *inPath == "" {
 		return errors.New("missing required arguments")
 	}
-	data, err := os.ReadFile(filepath.Clean(*inPath))
+	data, err := os.ReadFile(*inPath)
 	if err != nil {
 		return err
 	}

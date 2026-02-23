@@ -2,13 +2,12 @@ package ultrahdr_test
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/vearutop/ultrahdr"
 )
 
 func ExampleIsUltraHDR() {
-	f, err := os.Open(filepath.FromSlash("testdata/uhdr.jpg"))
+	f, err := os.Open("testdata/uhdr.jpg")
 	if err != nil {
 		return
 	}
@@ -18,7 +17,7 @@ func ExampleIsUltraHDR() {
 }
 
 func ExampleSplit_joinWithBundle() {
-	f, err := os.Open(filepath.FromSlash("testdata/uhdr.jpg"))
+	f, err := os.Open("testdata/uhdr.jpg")
 	if err != nil {
 		return
 	}
@@ -35,7 +34,7 @@ func ExampleSplit_joinWithBundle() {
 }
 
 func ExampleResizeHDR() {
-	f, err := os.Open(filepath.FromSlash("testdata/uhdr.jpg"))
+	f, err := os.Open("testdata/uhdr.jpg")
 	if err != nil {
 		return
 	}
@@ -44,7 +43,7 @@ func ExampleResizeHDR() {
 }
 
 func ExampleResizeSDR() {
-	f, err := os.Open(filepath.FromSlash("testdata/sample_srgb.jpg"))
+	f, err := os.Open("testdata/sample_srgb.jpg")
 	if err != nil {
 		return
 	}
@@ -52,7 +51,7 @@ func ExampleResizeSDR() {
 }
 
 func ExampleResizeSDRBatch() {
-	f, err := os.Open(filepath.FromSlash("testdata/sample_display_p3.jpg"))
+	f, err := os.Open("testdata/sample_display_p3.jpg")
 	if err != nil {
 		return
 	}
