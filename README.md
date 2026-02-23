@@ -92,6 +92,10 @@ Primary image interpolation is built in. Set `ResizeSpec.Interpolation` to one o
 `InterpolationMitchellNetravali`, `InterpolationLanczos2`, or `InterpolationLanczos3`. Gainmap
 resizing uses the same interpolation mode.
 
+`ResizeHDR` and `ResizeSDR` accept one or more `ResizeSpec` entries and deliver outputs via
+`ReceiveResult`. `ResizeHDR` also supports `ReceiveSplit` to inspect container metadata before
+resizing.
+
 ## Compatibility
 
 - Google Pixel UltraHDR JPEG/R files that store gainmap metadata in XMP only (no secondary ISO
@@ -150,6 +154,26 @@ Batch resize API:
 - Each spec receives a result via its `ReceiveResult` callback.
 - Resized/converted intermediate images are reused across variants (for example, multiple qualities
   at the same dimensions).
+
+## Join
+
+```go
+primary, _ := os.ReadFile("primary.jpg")
+gainmap, _ := os.ReadFile("gainmap.jpg")
+container, err := ultrahdr.Join(primary, gainmap, nil, nil)
+if err != nil {
+  // handle error
+}
+_ = os.WriteFile("out.jpg", container, 0o644)
+```
+
+If you have a split result, you can reuse its metadata:
+
+```go
+f, _ := os.Open("template.jpg")
+split, _ := ultrahdr.Split(f)
+container, _ := ultrahdr.Join(primary, gainmap, nil, split)
+```
 
 ## Limitations
 

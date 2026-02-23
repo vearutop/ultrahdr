@@ -242,7 +242,7 @@ func runSplit(args []string) error {
 		return err
 	}
 	if *metaOut != "" {
-		bundle, err := ultrahdr.BuildMetadataBundle(split.Primary, split.Segs)
+		bundle, err := split.BuildMetadataBundle()
 		if err != nil {
 			return err
 		}
@@ -288,31 +288,14 @@ func runJoin(args []string) error {
 		if err := json.Unmarshal(metaData, &bundle); err != nil {
 			return err
 		}
-		container, err := ultrahdr.AssembleFromBundle(primary, gainmap, &bundle)
+		container, err := ultrahdr.Join(primary, gainmap, &bundle, nil)
 		if err != nil {
 			return err
 		}
 		return os.WriteFile(*outPath, container, 0o644)
 	}
 	if *templatePath == "" {
-		secondaryXMP, secondaryISO, err := ultrahdr.ExtractGainmapMetadataSegments(gainmap)
-		if err != nil {
-			return err
-		}
-		if len(secondaryXMP) == 0 && len(secondaryISO) == 0 {
-			return errors.New("missing gainmap metadata (use -meta, -template, or embed XMP/ISO in gainmap)")
-		}
-		exif, icc, err := ultrahdr.ExtractEXIFAndICC(primary)
-		if err != nil {
-			return err
-		}
-		if len(exif) == 0 && len(icc) == 0 {
-			exif, icc, err = ultrahdr.ExtractEXIFAndICC(gainmap)
-			if err != nil {
-				return err
-			}
-		}
-		container, err := ultrahdr.AssembleContainer(primary, gainmap, exif, icc, secondaryXMP, secondaryISO)
+		container, err := ultrahdr.Join(primary, gainmap, nil, nil)
 		if err != nil {
 			return err
 		}
@@ -327,17 +310,7 @@ func runJoin(args []string) error {
 	if err != nil {
 		return err
 	}
-	exif, icc, err := ultrahdr.ExtractEXIFAndICC(primary)
-	if err != nil {
-		return err
-	}
-	if len(exif) == 0 && len(icc) == 0 {
-		exif, icc, err = ultrahdr.ExtractEXIFAndICC(split.Primary)
-		if err != nil {
-			return err
-		}
-	}
-	container, err := ultrahdr.AssembleContainer(primary, gainmap, exif, icc, split.Segs.SecondaryXMP, split.Segs.SecondaryISO)
+	container, err := ultrahdr.Join(primary, gainmap, nil, split)
 	if err != nil {
 		return err
 	}

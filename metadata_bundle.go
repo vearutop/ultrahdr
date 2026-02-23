@@ -17,20 +17,23 @@ type MetadataBundle struct {
 }
 
 // BuildMetadataBundle builds a metadata bundle from split segments and primary JPEG.
-func BuildMetadataBundle(primaryJPEG []byte, segs *MetadataSegments) (*MetadataBundle, error) {
-	if segs == nil {
+func (r *Result) BuildMetadataBundle() (*MetadataBundle, error) {
+	if r == nil {
+		return nil, errors.New("result is nil")
+	}
+	if r.Segs == nil {
 		return nil, errors.New("metadata segments missing")
 	}
-	exif, icc, err := extractExifAndIcc(primaryJPEG)
+	exif, icc, err := extractExifAndIcc(r.Primary)
 	if err != nil {
 		return nil, err
 	}
 	return &MetadataBundle{
 		Format:       metadataBundleFormat,
-		PrimaryXMP:   segs.PrimaryXMP,
-		PrimaryISO:   segs.PrimaryISO,
-		SecondaryXMP: segs.SecondaryXMP,
-		SecondaryISO: segs.SecondaryISO,
+		PrimaryXMP:   r.Segs.PrimaryXMP,
+		PrimaryISO:   r.Segs.PrimaryISO,
+		SecondaryXMP: r.Segs.SecondaryXMP,
+		SecondaryISO: r.Segs.SecondaryISO,
 		Exif:         exif,
 		ICC:          icc,
 	}, nil
@@ -53,8 +56,8 @@ func (b *MetadataBundle) Validate() error {
 	return nil
 }
 
-// AssembleFromBundle builds a container using metadata from the bundle.
-func AssembleFromBundle(primaryJPEG, gainmapJPEG []byte, b *MetadataBundle) ([]byte, error) {
+// assembleFromBundle builds a container using metadata from the bundle.
+func assembleFromBundle(primaryJPEG, gainmapJPEG []byte, b *MetadataBundle) ([]byte, error) {
 	if err := b.Validate(); err != nil {
 		return nil, err
 	}

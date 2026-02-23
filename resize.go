@@ -26,7 +26,7 @@ type ResizeSpec struct {
 }
 
 // ResizeHDR resizes an UltraHDR JPEG container to the requested dimensions.
-// Results are delivered via ReceiveResult on each spec.
+// Results are delivered via ReceiveResult on each spec; ReceiveSplit runs before resizing.
 func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 	if len(specs) == 0 {
 		return errors.New("no resize specs provided")
