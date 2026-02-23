@@ -83,7 +83,12 @@ func runResize(args []string) error {
 	if *inPath == "" || *outPath == "" || *width <= 0 || *height <= 0 {
 		return errors.New("missing required arguments")
 	}
-	return ultrahdr.ResizeUltraHDRFile(*inPath, *outPath, *width, *height, func(opt *ultrahdr.ResizeOptions) {
+	f, err := os.Open(filepath.Clean(*inPath))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	resized, err := ultrahdr.ResizeHDR(f, *width, *height, func(opt *ultrahdr.ResizeOptions) {
 		opt.PrimaryQuality = *q
 		opt.GainmapQuality = *gq
 		opt.PrimaryOut = *primaryOut
@@ -106,6 +111,23 @@ func runResize(args []string) error {
 		}
 		opt.Interpolation = interpMode
 	})
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Clean(*outPath), resized.Container, 0o644); err != nil {
+		return err
+	}
+	if *primaryOut != "" {
+		if err := os.WriteFile(filepath.Clean(*primaryOut), resized.Primary, 0o644); err != nil {
+			return err
+		}
+	}
+	if *gainmapOut != "" {
+		if err := os.WriteFile(filepath.Clean(*gainmapOut), resized.Gainmap, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func runRebase(args []string) error {

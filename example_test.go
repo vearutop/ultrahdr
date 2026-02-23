@@ -34,12 +34,13 @@ func ExampleSplit_joinWithBundle() {
 	_, _ = ultrahdr.AssembleFromBundle(sr.Primary, sr.Gainmap, bundle)
 }
 
-func ExampleResizeUltraHDR() {
-	data, err := os.ReadFile(filepath.FromSlash("testdata/uhdr.jpg"))
+func ExampleResizeHDR() {
+	f, err := os.Open(filepath.FromSlash("testdata/uhdr.jpg"))
 	if err != nil {
 		return
 	}
-	_, _ = ultrahdr.ResizeUltraHDR(data, 2400, 1600)
+	defer f.Close()
+	_, _ = ultrahdr.ResizeHDR(f, 2400, 1600)
 }
 
 func ExampleResizeSDR() {

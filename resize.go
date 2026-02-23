@@ -9,8 +9,6 @@ import (
 	"image/draw"
 	"io"
 	"math"
-	"os"
-	"path/filepath"
 
 	"github.com/vearutop/ultrahdr/internal/jpegx"
 )
@@ -22,7 +20,6 @@ type ResizeOptions struct {
 	// Interpolation selects the built-in interpolation mode for the primary image and gainmap
 	// when Resize is nil.
 	Interpolation Interpolation
-	OnResult      func(res *Result)
 	OnSplit       func(sr *Result)
 	PrimaryOut    string
 	GainmapOut    string
@@ -38,13 +35,13 @@ type ResizeSpec struct {
 	ReceiveResult func(data []byte, err error)
 }
 
-// ResizeUltraHDR resizes an UltraHDR JPEG container to the requested dimensions.
+// ResizeHDR resizes an UltraHDR JPEG container to the requested dimensions.
 // It returns the new container and the resized primary/gainmap JPEGs.
-func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptions)) (*Result, error) {
+func ResizeHDR(r io.Reader, width, height uint, opts ...func(o *ResizeOptions)) (*Result, error) {
 	if width <= 0 || height <= 0 {
 		return nil, errors.New("invalid target dimensions")
 	}
-	sr, err := Split(bytes.NewReader(data))
+	sr, err := Split(r)
 	if err != nil {
 		return nil, fmt.Errorf("split: %w", err)
 	}
@@ -94,10 +91,6 @@ func ResizeUltraHDR(data []byte, width, height uint, opts ...func(o *ResizeOptio
 		Container: container,
 		Primary:   primaryThumb,
 		Gainmap:   gainmapThumb,
-	}
-
-	if opt.OnResult != nil {
-		opt.OnResult(&res)
 	}
 
 	return &res, nil
@@ -230,40 +223,6 @@ func ResizeSDRBatch(r io.Reader, specs []ResizeSpec) error {
 		}
 	}
 
-	return nil
-}
-
-// ResizeUltraHDRFile reads an UltraHDR JPEG from inPath, resizes it, and writes
-// the container to outPath. If ResizeOptions.PrimaryOut or ResizeOptions.GainmapOut are non-empty, the
-// resized component JPEGs are written as well.
-func ResizeUltraHDRFile(inPath, outPath string, width, height uint, opts ...func(opt *ResizeOptions)) error {
-	data, err := os.ReadFile(inPath)
-	if err != nil {
-		return err
-	}
-	resized, err := ResizeUltraHDR(data, width, height, opts...)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Clean(outPath), resized.Container, 0o644); err != nil {
-		return err
-	}
-
-	opt := ResizeOptions{}
-	for _, applyOpt := range opts {
-		applyOpt(&opt)
-	}
-
-	if opt.PrimaryOut != "" {
-		if err := os.WriteFile(opt.PrimaryOut, resized.Primary, 0o644); err != nil {
-			return fmt.Errorf("write primary: %w", err)
-		}
-	}
-	if opt.GainmapOut != "" {
-		if err := os.WriteFile(opt.GainmapOut, resized.Gainmap, 0o644); err != nil {
-			return fmt.Errorf("write gainmap: %w", err)
-		}
-	}
 	return nil
 }
 
