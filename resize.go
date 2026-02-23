@@ -32,7 +32,7 @@ type ResizeSpec struct {
 	Quality       int
 	Interpolation Interpolation
 	KeepMeta      bool
-	ReceiveResult func(data []byte, err error)
+	ReceiveResult func(res *Result, err error)
 }
 
 // ResizeHDR resizes an UltraHDR JPEG container to the requested dimensions.
@@ -99,9 +99,9 @@ func ResizeHDR(r io.Reader, width, height uint, opts ...func(o *ResizeOptions)) 
 // ResizeSDR resizes a regular JPEG to the requested dimensions using the built-in
 // interpolation. When keepMeta is true, EXIF and ICC segments are preserved.
 // When keepMeta is false and input is a wide-gamut profile, output pixels are converted to sRGB.
-func ResizeSDR(r io.Reader, width, height uint, quality int, interp Interpolation, keepMeta bool) ([]byte, error) {
+func ResizeSDR(r io.Reader, width, height uint, quality int, interp Interpolation, keepMeta bool) (*Result, error) {
 	var (
-		res []byte
+		res *Result
 		err error
 	)
 	specs := []ResizeSpec{{
@@ -110,8 +110,8 @@ func ResizeSDR(r io.Reader, width, height uint, quality int, interp Interpolatio
 		Quality:       quality,
 		Interpolation: interp,
 		KeepMeta:      keepMeta,
-		ReceiveResult: func(d []byte, e error) {
-			res = d
+		ReceiveResult: func(r *Result, e error) {
+			res = r
 			err = e
 		},
 	}}
@@ -219,7 +219,7 @@ func ResizeSDRBatch(r io.Reader, specs []ResizeSpec) error {
 		}
 
 		if spec.ReceiveResult != nil {
-			spec.ReceiveResult(out, err)
+			spec.ReceiveResult(&Result{Container: out, Primary: out}, err)
 		}
 	}
 

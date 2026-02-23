@@ -13,12 +13,14 @@ func TestResizeSDRBatchMatchesSingle(t *testing.T) {
 		t.Fatalf("open sample: %v", err)
 	}
 
-	assertData := func(d []byte, err error) {
+	assertData := func(res *Result, err error) {
 		if err != nil {
 			t.Fatalf("assert data: %v", err)
 		}
-
-		cfg, _, err := image.DecodeConfig(bytes.NewReader(d))
+		if res == nil || res.Primary == nil {
+			t.Fatalf("missing result")
+		}
+		cfg, _, err := image.DecodeConfig(bytes.NewReader(res.Primary))
 		if err != nil {
 			t.Fatalf("decode config: %v", err)
 		}

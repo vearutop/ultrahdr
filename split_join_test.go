@@ -204,7 +204,7 @@ func TestResizeSDRKeepMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resize jpeg no meta: %v", err)
 	}
-	exifNo, iccNo, err := extractExifAndIcc(noMeta)
+	exifNo, iccNo, err := extractExifAndIcc(noMeta.Primary)
 	if err != nil {
 		t.Fatalf("extract exif/icc no meta: %v", err)
 	}
@@ -216,7 +216,7 @@ func TestResizeSDRKeepMeta(t *testing.T) {
 	if err != nil {
 		t.Fatalf("resize jpeg keep meta: %v", err)
 	}
-	exifYes, iccYes, err := extractExifAndIcc(withMeta)
+	exifYes, iccYes, err := extractExifAndIcc(withMeta.Primary)
 	if err != nil {
 		t.Fatalf("extract exif/icc keep meta: %v", err)
 	}
@@ -232,10 +232,10 @@ func TestResizeSDRKeepMeta(t *testing.T) {
 		}
 	}
 
-	if err := os.WriteFile("testdata/resizejpeg_bilinear.jpg", noMeta, 0o644); err != nil {
+	if err := os.WriteFile("testdata/resizejpeg_bilinear.jpg", noMeta.Primary, 0o644); err != nil {
 		t.Fatalf("write resizejpeg_bilinear.jpg: %v", err)
 	}
-	if err := os.WriteFile("testdata/resizejpeg_bilinear_keepmeta.jpg", withMeta, 0o644); err != nil {
+	if err := os.WriteFile("testdata/resizejpeg_bilinear_keepmeta.jpg", withMeta.Primary, 0o644); err != nil {
 		t.Fatalf("write resizejpeg_bilinear_keepmeta.jpg: %v", err)
 	}
 }

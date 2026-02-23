@@ -56,9 +56,9 @@ func ExampleResizeSDRBatch() {
 		return
 	}
 	specs := []ultrahdr.ResizeSpec{
-		{Width: 1200, Height: 800, Quality: 85, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: true, ReceiveResult: func(d []byte, err error) { _ = d }},
-		{Width: 600, Height: 400, Quality: 82, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(d []byte, err error) { _ = d }},
-		{Width: 300, Height: 200, Quality: 78, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(d []byte, err error) { _ = d }},
+		{Width: 1200, Height: 800, Quality: 85, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: true, ReceiveResult: func(res *ultrahdr.Result, err error) { _ = res }},
+		{Width: 600, Height: 400, Quality: 82, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(res *ultrahdr.Result, err error) { _ = res }},
+		{Width: 300, Height: 200, Quality: 78, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(res *ultrahdr.Result, err error) { _ = res }},
 	}
 	err = ultrahdr.ResizeSDRBatch(f, specs)
 	if err != nil {

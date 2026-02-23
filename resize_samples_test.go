@@ -49,8 +49,11 @@ func TestResizeSDRSampleColorSpaces(t *testing.T) {
 				t.Fatalf("resize with meta: %v", err)
 			}
 
-			checkDims := func(label string, b []byte) {
-				cfg, _, err := image.DecodeConfig(bytes.NewReader(b))
+			checkDims := func(label string, res *Result) {
+				if res == nil || res.Primary == nil {
+					t.Fatalf("%s missing result", label)
+				}
+				cfg, _, err := image.DecodeConfig(bytes.NewReader(res.Primary))
 				if err != nil {
 					t.Fatalf("decode config %s: %v", label, err)
 				}
@@ -65,10 +68,10 @@ func TestResizeSDRSampleColorSpaces(t *testing.T) {
 			noMetaPath := filepath.Join(outDir, base+"_th_nometa.jpg")
 			withMetaPath := filepath.Join(outDir, base+"_th_keepmeta.jpg")
 
-			if err := os.WriteFile(noMetaPath, withoutMeta, 0o644); err != nil {
+			if err := os.WriteFile(noMetaPath, withoutMeta.Primary, 0o644); err != nil {
 				t.Fatalf("write nometa output: %v", err)
 			}
-			if err := os.WriteFile(withMetaPath, withMeta, 0o644); err != nil {
+			if err := os.WriteFile(withMetaPath, withMeta.Primary, 0o644); err != nil {
 				t.Fatalf("write keepmeta output: %v", err)
 			}
 		})

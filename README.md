@@ -129,7 +129,7 @@ resized, err := ultrahdr.ResizeSDR(f, 1600, 1200, 85, ultrahdr.InterpolationLanc
 if err != nil {
 	// handle error
 }
-_ = os.WriteFile("output.jpg", resized, 0o644)
+_ = os.WriteFile("output.jpg", resized.Primary, 0o644)
 ```
 
 `ResizeSDR` behavior:
