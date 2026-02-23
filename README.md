@@ -125,7 +125,15 @@ if err != nil {
 	// handle error
 }
 defer f.Close()
-resized, err := ultrahdr.ResizeSDR(f, 1600, 1200, 85, ultrahdr.InterpolationLanczos2, true)
+var resized *ultrahdr.Result
+err := ultrahdr.ResizeSDR(f, ultrahdr.ResizeSpec{
+  Width:         1600,
+  Height:        1200,
+  Quality:       85,
+  Interpolation: ultrahdr.InterpolationLanczos2,
+  KeepMeta:      true,
+  ReceiveResult: func(res *ultrahdr.Result, err error) { resized = res },
+})
 if err != nil {
 	// handle error
 }
@@ -133,12 +141,12 @@ _ = os.WriteFile("output.jpg", resized.Primary, 0o644)
 ```
 
 `ResizeSDR` behavior:
-- `keepMeta=true`: preserves EXIF/ICC (including Display P3 and Adobe RGB profiles).
-- `keepMeta=false`: strips metadata and converts Display P3/Adobe RGB input to sRGB pixels for
+- `KeepMeta=true`: preserves EXIF/ICC (including Display P3 and Adobe RGB profiles).
+- `KeepMeta=false`: strips metadata and converts Display P3/Adobe RGB input to sRGB pixels for
   web-safe output.
 
 Batch resize API:
-- `ResizeSDRBatch` accepts multiple `ResizeSpec` entries and performs a single source decode.
+- `ResizeSDR` accepts multiple `ResizeSpec` entries and performs a single source decode.
 - Each spec receives a result via its `ReceiveResult` callback.
 - Resized/converted intermediate images are reused across variants (for example, multiple qualities
   at the same dimensions).

@@ -102,15 +102,24 @@ func runResize(args []string) error {
 	case "lanczos3":
 		interpMode = ultrahdr.InterpolationLanczos3
 	}
-	resized, err := ultrahdr.ResizeHDR(f, ultrahdr.ResizeSpec{
+	var resized *ultrahdr.Result
+	err = ultrahdr.ResizeHDR(f, ultrahdr.ResizeSpec{
 		Width:          *width,
 		Height:         *height,
 		Quality:        *q,
 		GainmapQuality: *gq,
 		Interpolation:  interpMode,
+		ReceiveResult: func(res *ultrahdr.Result, err error) {
+			if err == nil {
+				resized = res
+			}
+		},
 	})
 	if err != nil {
 		return err
+	}
+	if resized == nil {
+		return errors.New("resize produced no output")
 	}
 	if err := os.WriteFile(*outPath, resized.Container, 0o644); err != nil {
 		return err

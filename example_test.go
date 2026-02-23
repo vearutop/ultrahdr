@@ -39,7 +39,10 @@ func ExampleResizeHDR() {
 		return
 	}
 	defer f.Close()
-	_, _ = ultrahdr.ResizeHDR(f, ultrahdr.ResizeSpec{Width: 2400, Height: 1600})
+	_ = ultrahdr.ResizeHDR(f, ultrahdr.ResizeSpec{
+		Width:  2400,
+		Height: 1600,
+	})
 }
 
 func ExampleResizeSDR() {
@@ -47,10 +50,16 @@ func ExampleResizeSDR() {
 	if err != nil {
 		return
 	}
-	_, _ = ultrahdr.ResizeSDR(f, 800, 600, 85, ultrahdr.InterpolationLanczos2, true)
+	_ = ultrahdr.ResizeSDR(f, ultrahdr.ResizeSpec{
+		Width:         800,
+		Height:        600,
+		Quality:       85,
+		Interpolation: ultrahdr.InterpolationLanczos2,
+		KeepMeta:      true,
+	})
 }
 
-func ExampleResizeSDRBatch() {
+func ExampleResizeSDR_multi() {
 	f, err := os.Open("testdata/sample_display_p3.jpg")
 	if err != nil {
 		return
@@ -60,7 +69,7 @@ func ExampleResizeSDRBatch() {
 		{Width: 600, Height: 400, Quality: 82, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(res *ultrahdr.Result, err error) { _ = res }},
 		{Width: 300, Height: 200, Quality: 78, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(res *ultrahdr.Result, err error) { _ = res }},
 	}
-	err = ultrahdr.ResizeSDRBatch(f, specs)
+	err = ultrahdr.ResizeSDR(f, specs...)
 	if err != nil {
 		return
 	}

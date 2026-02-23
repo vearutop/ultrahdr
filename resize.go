@@ -13,113 +13,108 @@ import (
 	"github.com/vearutop/ultrahdr/internal/jpegx"
 )
 
-// ResizeSpec describes one output variant for ResizeSDRBatch and options for ResizeHDR.
+// ResizeSpec describes one output variant for ResizeSDR/ResizeHDR.
 type ResizeSpec struct {
 	Width          uint                         // Target width in pixels.
 	Height         uint                         // Target height in pixels.
 	Quality        int                          // SDR/primary JPEG quality (0 uses default).
 	GainmapQuality int                          // Gainmap JPEG quality for HDR resize (0 uses default or Quality).
 	Interpolation  Interpolation                // Resize interpolation mode for SDR and HDR paths.
-	KeepMeta       bool                         // SDR-only: preserve EXIF/ICC and skip sRGB conversion when true.
-	ReceiveResult  func(res *Result, err error) // SDR-only: callback for ResizeSDRBatch outputs.
-	ReceiveSplit   func(sr *Result)             // HDR-only: callback with split result before resizing.
+	KeepMeta       bool                         // SDR: preserve EXIF/ICC and skip sRGB conversion when true.
+	ReceiveResult  func(res *Result, err error) // Callback for each output.
+	ReceiveSplit   func(sr *Result)             // HDR: callback with split result before resizing.
 }
 
 // ResizeHDR resizes an UltraHDR JPEG container to the requested dimensions.
-// It returns the new container and the resized primary/gainmap JPEGs.
-func ResizeHDR(r io.Reader, spec ResizeSpec) (*Result, error) {
-	if spec.Width == 0 || spec.Height == 0 {
-		return nil, errors.New("invalid target dimensions")
+// Results are delivered via ReceiveResult on each spec.
+func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
+	if len(specs) == 0 {
+		return errors.New("no resize specs provided")
+	}
+	if r == nil {
+		return errors.New("missing input reader")
 	}
 	sr, err := Split(r)
 	if err != nil {
-		return nil, fmt.Errorf("split: %w", err)
+		return fmt.Errorf("split: %w", err)
 	}
 	if sr.Segs == nil {
-		return nil, errors.New("metadata segments missing")
+		return errors.New("metadata segments missing")
+	}
+	for _, spec := range specs {
+		if spec.ReceiveSplit != nil {
+			spec.ReceiveSplit(sr)
+		}
 	}
 
-	primaryQuality := defaultPrimaryQuality
-	gainmapQuality := defaultGainMapQuality
-	interp := InterpolationNearest
-	if spec.Quality > 0 {
-		primaryQuality = spec.Quality
-	}
-	if spec.GainmapQuality > 0 {
-		gainmapQuality = spec.GainmapQuality
-	} else if spec.Quality > 0 {
-		gainmapQuality = spec.Quality
-	}
-	if spec.Interpolation != 0 {
-		interp = spec.Interpolation
-	}
-
-	if spec.ReceiveSplit != nil {
-		spec.ReceiveSplit(sr)
-	}
-
-	primaryThumb, err := resizeJPEG(sr.Primary, spec.Width, spec.Height, nil, primaryQuality, interp)
-	if err != nil {
-		return nil, fmt.Errorf("resize primary: %w", err)
-	}
-	gainmapThumb, err := resizeGainmapJPEG(sr.Gainmap, spec.Width, spec.Height, nil, gainmapQuality, sr.Meta, interp)
-	if err != nil {
-		return nil, fmt.Errorf("resize gainmap: %w", err)
-	}
 	exif, icc, err := extractExifAndIcc(sr.Primary)
 	if err != nil {
-		return nil, fmt.Errorf("extract exif and icc: %w", err)
+		return fmt.Errorf("extract exif and icc: %w", err)
 	}
 	secondaryISO := sr.Segs.SecondaryISO
 	if len(secondaryISO) == 0 && sr.Meta != nil {
 		secondaryISO, err = buildIsoPayload(sr.Meta)
 		if err != nil {
-			return nil, fmt.Errorf("encode gainmap iso: %w", err)
+			return fmt.Errorf("encode gainmap iso: %w", err)
 		}
 	}
-	container, err := assembleContainerVipsLike(primaryThumb, gainmapThumb, exif, icc, sr.Segs.SecondaryXMP, secondaryISO)
-	if err != nil {
-		return nil, fmt.Errorf("assemble container: %w", err)
-	}
 
-	res := Result{
-		Container: container,
-		Primary:   primaryThumb,
-		Gainmap:   gainmapThumb,
+	for _, spec := range specs {
+		if spec.Width == 0 || spec.Height == 0 {
+			err := errors.New("invalid target dimensions")
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return err
+		}
+
+		primaryQuality := defaultPrimaryQuality
+		gainmapQuality := defaultGainMapQuality
+		interp := InterpolationNearest
+		if spec.Quality > 0 {
+			primaryQuality = spec.Quality
+		}
+		if spec.GainmapQuality > 0 {
+			gainmapQuality = spec.GainmapQuality
+		} else if spec.Quality > 0 {
+			gainmapQuality = spec.Quality
+		}
+		if spec.Interpolation != 0 {
+			interp = spec.Interpolation
+		}
+
+		primaryThumb, err := resizeJPEG(sr.Primary, spec.Width, spec.Height, nil, primaryQuality, interp)
+		if err != nil {
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return fmt.Errorf("resize primary: %w", err)
+		}
+		gainmapThumb, err := resizeGainmapJPEG(sr.Gainmap, spec.Width, spec.Height, nil, gainmapQuality, sr.Meta, interp)
+		if err != nil {
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return fmt.Errorf("resize gainmap: %w", err)
+		}
+		container, err := assembleContainerVipsLike(primaryThumb, gainmapThumb, exif, icc, sr.Segs.SecondaryXMP, secondaryISO)
+		if err != nil {
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return fmt.Errorf("assemble container: %w", err)
+		}
+		if spec.ReceiveResult != nil {
+			spec.ReceiveResult(&Result{Container: container, Primary: primaryThumb, Gainmap: gainmapThumb}, nil)
+		}
 	}
-	return &res, nil
+	return nil
 }
 
-// ResizeSDR resizes a regular JPEG to the requested dimensions using the built-in
-// interpolation. When keepMeta is true, EXIF and ICC segments are preserved.
-// When keepMeta is false and input is a wide-gamut profile, output pixels are converted to sRGB.
-func ResizeSDR(r io.Reader, width, height uint, quality int, interp Interpolation, keepMeta bool) (*Result, error) {
-	var (
-		res *Result
-		err error
-	)
-	specs := []ResizeSpec{{
-		Width:         width,
-		Height:        height,
-		Quality:       quality,
-		Interpolation: interp,
-		KeepMeta:      keepMeta,
-		ReceiveResult: func(r *Result, e error) {
-			res = r
-			err = e
-		},
-	}}
-	err = ResizeSDRBatch(r, specs)
-	if err != nil {
-		return nil, err
-	}
-	return res, err
-}
-
-// ResizeSDRBatch resizes one JPEG into multiple outputs with a single source decode.
+// ResizeSDR resizes one JPEG into multiple outputs with a single source decode.
 // For each spec: when KeepMeta is true EXIF/ICC are preserved; otherwise output is metadata-free.
 // Metadata-free outputs are converted to sRGB when source profile is recognized as wide gamut.
-func ResizeSDRBatch(r io.Reader, specs []ResizeSpec) error {
+func ResizeSDR(r io.Reader, specs ...ResizeSpec) error {
 	if len(specs) == 0 {
 		return errors.New("no resize specs provided")
 	}

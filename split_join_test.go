@@ -31,7 +31,7 @@ func BenchmarkResizeSDR(b *testing.B) {
 		b.Run(bench.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				_, err := ResizeHDR(bytes.NewReader(j), ResizeSpec{
+				err := ResizeHDR(bytes.NewReader(j), ResizeSpec{
 					Width:         300,
 					Height:        200,
 					Interpolation: bench.interp,
@@ -56,11 +56,16 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 		t.Fatalf("open uhdr: %v", err)
 	}
 	defer f.Close()
-	result, err = ResizeHDR(f, ResizeSpec{
+	err = ResizeHDR(f, ResizeSpec{
 		Width:  2400,
 		Height: 1600,
 		ReceiveSplit: func(sr *Result) {
 			split = sr
+		},
+		ReceiveResult: func(res *Result, err error) {
+			if err == nil {
+				result = res
+			}
 		},
 	})
 	if err != nil {
@@ -173,13 +178,22 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 		t.Fatalf("open uhdr: %v", err)
 	}
 	defer f.Close()
-	resized, err := ResizeHDR(f, ResizeSpec{
+	var resized *Result
+	err = ResizeHDR(f, ResizeSpec{
 		Width:         300,
 		Height:        200,
 		Interpolation: interp,
+		ReceiveResult: func(res *Result, err error) {
+			if err == nil {
+				resized = res
+			}
+		},
 	})
 	if err != nil {
 		t.Fatalf("resize %s: %v", name, err)
+	}
+	if resized == nil {
+		t.Fatalf("resize %s: missing result", name)
 	}
 
 	err = os.WriteFile(container, resized.Container, 0o644)
@@ -216,9 +230,24 @@ func TestResizeSDRKeepMeta(t *testing.T) {
 		t.Skip("primary jpeg has no exif/icc to verify")
 	}
 
-	noMeta, err := ResizeSDR(bytes.NewReader(split.Primary), 600, 400, 85, InterpolationBilinear, false)
+	var noMeta *Result
+	err = ResizeSDR(bytes.NewReader(split.Primary), ResizeSpec{
+		Width:         600,
+		Height:        400,
+		Quality:       85,
+		Interpolation: InterpolationBilinear,
+		KeepMeta:      false,
+		ReceiveResult: func(res *Result, err error) {
+			if err == nil {
+				noMeta = res
+			}
+		},
+	})
 	if err != nil {
 		t.Fatalf("resize jpeg no meta: %v", err)
+	}
+	if noMeta == nil {
+		t.Fatalf("resize jpeg no meta: missing result")
 	}
 	exifNo, iccNo, err := extractExifAndIcc(noMeta.Primary)
 	if err != nil {
@@ -228,9 +257,24 @@ func TestResizeSDRKeepMeta(t *testing.T) {
 		t.Fatalf("unexpected metadata preserved")
 	}
 
-	withMeta, err := ResizeSDR(bytes.NewReader(split.Primary), 600, 400, 85, InterpolationBilinear, true)
+	var withMeta *Result
+	err = ResizeSDR(bytes.NewReader(split.Primary), ResizeSpec{
+		Width:         600,
+		Height:        400,
+		Quality:       85,
+		Interpolation: InterpolationBilinear,
+		KeepMeta:      true,
+		ReceiveResult: func(res *Result, err error) {
+			if err == nil {
+				withMeta = res
+			}
+		},
+	})
 	if err != nil {
 		t.Fatalf("resize jpeg keep meta: %v", err)
+	}
+	if withMeta == nil {
+		t.Fatalf("resize jpeg keep meta: missing result")
 	}
 	exifYes, iccYes, err := extractExifAndIcc(withMeta.Primary)
 	if err != nil {
@@ -288,7 +332,7 @@ func TestResizeParallelNoRace(t *testing.T) {
 				case 1:
 					interp = InterpolationMitchellNetravali
 				}
-				_, err := ResizeHDR(bytes.NewReader(data), ResizeSpec{
+				err := ResizeHDR(bytes.NewReader(data), ResizeSpec{
 					Width:         uint(width),
 					Height:        uint(height),
 					Interpolation: interp,
@@ -301,7 +345,13 @@ func TestResizeParallelNoRace(t *testing.T) {
 					t.Logf("%s worker=%d iter=%d ResizeHDR=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
 				}
 				start = time.Now()
-				if _, err := ResizeSDR(bytes.NewReader(jpegData), uint(width), uint(height), 85, InterpolationLanczos2, false); err != nil {
+				if err := ResizeSDR(bytes.NewReader(jpegData), ResizeSpec{
+					Width:         uint(width),
+					Height:        uint(height),
+					Quality:       85,
+					Interpolation: InterpolationLanczos2,
+					KeepMeta:      false,
+				}); err != nil {
 					errCh <- err
 					return
 				}

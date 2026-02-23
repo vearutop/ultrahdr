@@ -36,7 +36,7 @@ func TestResizeSDRBatchMatchesSingle(t *testing.T) {
 		{Width: 300, Height: 200, Quality: 92, Interpolation: InterpolationBilinear, KeepMeta: false, ReceiveResult: assertData},
 	}
 
-	err = ResizeSDRBatch(f, specs)
+	err = ResizeSDR(f, specs...)
 	if err != nil {
 		t.Fatalf("batch resize: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestResizeSDRBatchInvalid(t *testing.T) {
 		t.Fatalf("open sample: %v", err)
 	}
 
-	if err := ResizeSDRBatch(f, nil); err == nil {
+	if err := ResizeSDR(f); err == nil {
 		t.Fatal("expected error for empty specs")
 	}
 
@@ -56,7 +56,7 @@ func TestResizeSDRBatchInvalid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sample: %v", err)
 	}
-	if err := ResizeSDRBatch(f, []ResizeSpec{{Width: 0, Height: 100, Quality: 80}}); err == nil {
+	if err := ResizeSDR(f, ResizeSpec{Width: 0, Height: 100, Quality: 80}); err == nil {
 		t.Fatal("expected error for zero width")
 	}
 }

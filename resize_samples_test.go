@@ -36,17 +36,47 @@ func TestResizeSDRSampleColorSpaces(t *testing.T) {
 			if err != nil {
 				t.Fatalf("open sample: %v", err)
 			}
-			withoutMeta, err := ResizeSDR(f, outW, outH, quality, InterpolationLanczos2, false)
+			var withoutMeta *Result
+			err = ResizeSDR(f, ResizeSpec{
+				Width:         outW,
+				Height:        outH,
+				Quality:       quality,
+				Interpolation: InterpolationLanczos2,
+				KeepMeta:      false,
+				ReceiveResult: func(res *Result, err error) {
+					if err == nil {
+						withoutMeta = res
+					}
+				},
+			})
 			if err != nil {
 				t.Fatalf("resize without meta: %v", err)
+			}
+			if withoutMeta == nil {
+				t.Fatalf("resize without meta: missing result")
 			}
 			f, err = os.Open(sample)
 			if err != nil {
 				t.Fatalf("open sample: %v", err)
 			}
-			withMeta, err := ResizeSDR(f, outW, outH, quality, InterpolationLanczos2, true)
+			var withMeta *Result
+			err = ResizeSDR(f, ResizeSpec{
+				Width:         outW,
+				Height:        outH,
+				Quality:       quality,
+				Interpolation: InterpolationLanczos2,
+				KeepMeta:      true,
+				ReceiveResult: func(res *Result, err error) {
+					if err == nil {
+						withMeta = res
+					}
+				},
+			})
 			if err != nil {
 				t.Fatalf("resize with meta: %v", err)
+			}
+			if withMeta == nil {
+				t.Fatalf("resize with meta: missing result")
 			}
 
 			checkDims := func(label string, res *Result) {
