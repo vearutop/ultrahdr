@@ -5,12 +5,11 @@ import (
 	"encoding/binary"
 	"errors"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 )
 
-func BenchmarkResize(b *testing.B) {
+func BenchmarkResizeSDR(b *testing.B) {
 	j, err := os.ReadFile("testdata/small_uhdr.jpg")
 	if err != nil {
 		b.Fatal(err)
@@ -32,8 +31,10 @@ func BenchmarkResize(b *testing.B) {
 		b.Run(bench.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
-				_, err := ResizeUltraHDR(j, 300, 200, func(opts *ResizeOptions) {
-					opts.Interpolation = bench.interp
+				err := ResizeHDR(bytes.NewReader(j), ResizeSpec{
+					Width:         300,
+					Height:        200,
+					Interpolation: bench.interp,
 				})
 				if err != nil {
 					b.Fatal(err)
@@ -45,26 +46,36 @@ func BenchmarkResize(b *testing.B) {
 
 func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	var (
-		result *ResizeResult
-		split  *SplitResult
+		result *Result
+		split  *Result
 	)
 
 	// Use a known valid UltraHDR JPEG.
-	err := ResizeUltraHDRFile("testdata/small_uhdr.jpg", "testdata/uhdr_thumb.jpg", 2400, 1600,
-		func(opts *ResizeOptions) {
-			opts.OnResult = func(res *ResizeResult) {
+	f, err := os.Open("testdata/small_uhdr.jpg")
+	if err != nil {
+		t.Fatalf("open uhdr: %v", err)
+	}
+	defer f.Close()
+	err = ResizeHDR(f, ResizeSpec{
+		Width:  2400,
+		Height: 1600,
+		ReceiveSplit: func(sr *Result) {
+			split = sr
+		},
+		ReceiveResult: func(res *Result, err error) {
+			if err == nil {
 				result = res
 			}
-			opts.OnSplit = func(sr *SplitResult) {
-				split = sr
-			}
-		})
+		},
+	})
 	if err != nil {
 		t.Fatalf("resize uhdr: %v", err)
 	}
-
-	if result == nil {
+	if result == nil || result.Container == nil {
 		t.Fatalf("resize result missing")
+	}
+	if err := os.WriteFile("testdata/uhdr_thumb.jpg", result.Container, 0o644); err != nil {
+		t.Fatalf("write uhdr_thumb.jpg: %v", err)
 	}
 
 	if split == nil {
@@ -80,16 +91,16 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("repack join: %v", err)
 	}
-	if err := os.WriteFile(filepath.FromSlash("testdata/uhdr_repacked.jpg"), repacked, 0o644); err != nil {
+	if err := os.WriteFile("testdata/uhdr_repacked.jpg", repacked, 0o644); err != nil {
 		t.Fatalf("write uhdr_repacked.jpg: %v", err)
 	}
 
-	sr2, err := Split(result.Container)
+	sr2, err := Split(bytes.NewReader(result.Container))
 	if err != nil {
 		t.Fatalf("split after join: %v", err)
 	}
-	p2 := sr2.PrimaryJPEG
-	g2 := sr2.GainmapJPEG
+	p2 := sr2.Primary
+	g2 := sr2.Gainmap
 	meta2 := sr2.Meta
 
 	if len(p2) < 4 || p2[0] != 0xFF || p2[1] != 0xD8 || p2[len(p2)-2] != 0xFF || p2[len(p2)-1] != 0xD9 {
@@ -102,7 +113,7 @@ func TestSplitJoinRoundTripWithSampleJPEG(t *testing.T) {
 		t.Fatalf("metadata missing")
 	}
 	// Compare marker sequence and MPF offsets against vips output.
-	vipsData, err := os.ReadFile(filepath.FromSlash("testdata/uhdr.vips_thumb.jpg"))
+	vipsData, err := os.ReadFile("testdata/uhdr.vips_thumb.jpg")
 	if err != nil {
 		t.Fatalf("read uhdr.vips_thumb.jpg: %v", err)
 	}
@@ -162,31 +173,56 @@ func writeResizeArtifacts(t *testing.T, name string, interp Interpolation) {
 	container := "testdata/uhdr_thumb_" + name + ".jpg"
 	primary := "testdata/uhdr_thumb_" + name + "_primary.jpg"
 	gainmap := "testdata/uhdr_thumb_" + name + "_gainmap.jpg"
-	if err := ResizeUltraHDRFile(
-		"testdata/small_uhdr.jpg",
-		container,
-		300,
-		200,
-		func(opts *ResizeOptions) {
-			opts.Interpolation = interp
-			opts.PrimaryOut = primary
-			opts.GainmapOut = gainmap
+	f, err := os.Open("testdata/small_uhdr.jpg")
+	if err != nil {
+		t.Fatalf("open uhdr: %v", err)
+	}
+	defer f.Close()
+	var resized *Result
+	err = ResizeHDR(f, ResizeSpec{
+		Width:         300,
+		Height:        200,
+		Interpolation: interp,
+		ReceiveResult: func(res *Result, err error) {
+			if err == nil {
+				resized = res
+			}
 		},
-	); err != nil {
+	})
+	if err != nil {
 		t.Fatalf("resize %s: %v", name, err)
+	}
+	if resized == nil {
+		t.Fatalf("resize %s: missing result", name)
+	}
+
+	err = os.WriteFile(container, resized.Container, 0o644)
+	if err != nil {
+		t.Fatalf("write %s: %v", container, err)
+	}
+
+	err = os.WriteFile(primary, resized.Primary, 0o644)
+	if err != nil {
+		t.Fatalf("write %s: %v", primary, err)
+	}
+
+	err = os.WriteFile(gainmap, resized.Gainmap, 0o644)
+	if err != nil {
+		t.Fatalf("write %s: %v", gainmap, err)
 	}
 }
 
-func TestResizeJPEGKeepMeta(t *testing.T) {
-	data, err := os.ReadFile("testdata/small_uhdr.jpg")
+func TestResizeSDRKeepMeta(t *testing.T) {
+	f, err := os.Open("testdata/small_uhdr.jpg")
 	if err != nil {
-		t.Fatalf("read uhdr: %v", err)
+		t.Fatalf("open uhdr: %v", err)
 	}
-	split, err := Split(data)
+	defer f.Close()
+	split, err := Split(f)
 	if err != nil {
 		t.Fatalf("split: %v", err)
 	}
-	exif, icc, err := extractExifAndIcc(split.PrimaryJPEG)
+	exif, icc, err := extractExifAndIcc(split.Primary)
 	if err != nil {
 		t.Fatalf("extract exif/icc: %v", err)
 	}
@@ -194,11 +230,26 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 		t.Skip("primary jpeg has no exif/icc to verify")
 	}
 
-	noMeta, err := ResizeJPEG(split.PrimaryJPEG, 600, 400, 85, InterpolationBilinear, false)
+	var noMeta *Result
+	err = ResizeSDR(bytes.NewReader(split.Primary), ResizeSpec{
+		Width:         600,
+		Height:        400,
+		Quality:       85,
+		Interpolation: InterpolationBilinear,
+		KeepMeta:      false,
+		ReceiveResult: func(res *Result, err error) {
+			if err == nil {
+				noMeta = res
+			}
+		},
+	})
 	if err != nil {
 		t.Fatalf("resize jpeg no meta: %v", err)
 	}
-	exifNo, iccNo, err := extractExifAndIcc(noMeta)
+	if noMeta == nil {
+		t.Fatalf("resize jpeg no meta: missing result")
+	}
+	exifNo, iccNo, err := extractExifAndIcc(noMeta.Primary)
 	if err != nil {
 		t.Fatalf("extract exif/icc no meta: %v", err)
 	}
@@ -206,11 +257,26 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 		t.Fatalf("unexpected metadata preserved")
 	}
 
-	withMeta, err := ResizeJPEG(split.PrimaryJPEG, 600, 400, 85, InterpolationBilinear, true)
+	var withMeta *Result
+	err = ResizeSDR(bytes.NewReader(split.Primary), ResizeSpec{
+		Width:         600,
+		Height:        400,
+		Quality:       85,
+		Interpolation: InterpolationBilinear,
+		KeepMeta:      true,
+		ReceiveResult: func(res *Result, err error) {
+			if err == nil {
+				withMeta = res
+			}
+		},
+	})
 	if err != nil {
 		t.Fatalf("resize jpeg keep meta: %v", err)
 	}
-	exifYes, iccYes, err := extractExifAndIcc(withMeta)
+	if withMeta == nil {
+		t.Fatalf("resize jpeg keep meta: missing result")
+	}
+	exifYes, iccYes, err := extractExifAndIcc(withMeta.Primary)
 	if err != nil {
 		t.Fatalf("extract exif/icc keep meta: %v", err)
 	}
@@ -226,10 +292,10 @@ func TestResizeJPEGKeepMeta(t *testing.T) {
 		}
 	}
 
-	if err := os.WriteFile("testdata/resizejpeg_bilinear.jpg", noMeta, 0o644); err != nil {
+	if err := os.WriteFile("testdata/resizejpeg_bilinear.jpg", noMeta.Primary, 0o644); err != nil {
 		t.Fatalf("write resizejpeg_bilinear.jpg: %v", err)
 	}
-	if err := os.WriteFile("testdata/resizejpeg_bilinear_keepmeta.jpg", withMeta, 0o644); err != nil {
+	if err := os.WriteFile("testdata/resizejpeg_bilinear_keepmeta.jpg", withMeta.Primary, 0o644); err != nil {
 		t.Fatalf("write resizejpeg_bilinear_keepmeta.jpg: %v", err)
 	}
 }
@@ -244,12 +310,12 @@ func TestResizeParallelNoRace(t *testing.T) {
 	iterations := 3
 	width, height := 300, 200
 
-	sr, err := Split(data)
+	sr, err := Split(bytes.NewReader(data))
 	if err != nil {
 		t.Fatalf("split: %v", err)
 	}
 
-	jpegData := sr.PrimaryJPEG
+	jpegData := sr.Primary
 
 	errCh := make(chan error, workers)
 	for i := 0; i < workers; i++ {
@@ -259,30 +325,38 @@ func TestResizeParallelNoRace(t *testing.T) {
 					t.Logf("%s worker=%d iter=%d", time.Now().Format(time.RFC3339Nano), idx, j)
 				}
 				start := time.Now()
-				_, err := ResizeUltraHDR(data, uint(width), uint(height), func(opts *ResizeOptions) {
-					switch (idx + j) % 3 {
-					case 0:
-						opts.Interpolation = InterpolationBilinear
-					case 1:
-						opts.Interpolation = InterpolationMitchellNetravali
-					default:
-						opts.Interpolation = InterpolationLanczos3
-					}
+				interp := InterpolationLanczos3
+				switch (idx + j) % 3 {
+				case 0:
+					interp = InterpolationBilinear
+				case 1:
+					interp = InterpolationMitchellNetravali
+				}
+				err := ResizeHDR(bytes.NewReader(data), ResizeSpec{
+					Width:         uint(width),
+					Height:        uint(height),
+					Interpolation: interp,
 				})
 				if err != nil {
 					errCh <- err
 					return
 				}
 				if testing.Verbose() {
-					t.Logf("%s worker=%d iter=%d ResizeUltraHDR=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
+					t.Logf("%s worker=%d iter=%d ResizeHDR=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
 				}
 				start = time.Now()
-				if _, err := ResizeJPEG(jpegData, uint(width), uint(height), 85, InterpolationLanczos2, false); err != nil {
+				if err := ResizeSDR(bytes.NewReader(jpegData), ResizeSpec{
+					Width:         uint(width),
+					Height:        uint(height),
+					Quality:       85,
+					Interpolation: InterpolationLanczos2,
+					KeepMeta:      false,
+				}); err != nil {
 					errCh <- err
 					return
 				}
 				if testing.Verbose() {
-					t.Logf("%s worker=%d iter=%d ResizeJPEG=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
+					t.Logf("%s worker=%d iter=%d ResizeSDR=%s", time.Now().Format(time.RFC3339Nano), idx, j, time.Since(start))
 				}
 			}
 			errCh <- nil

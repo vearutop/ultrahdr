@@ -7,18 +7,20 @@ import (
 	"testing"
 )
 
-func TestResizeJPEGBatchMatchesSingle(t *testing.T) {
-	data, err := os.ReadFile("testdata/sample_display_p3.jpg")
+func TestResizeSDRBatchMatchesSingle(t *testing.T) {
+	f, err := os.Open("testdata/sample_display_p3.jpg")
 	if err != nil {
-		t.Fatalf("read sample: %v", err)
+		t.Fatalf("open sample: %v", err)
 	}
 
-	assertData := func(d []byte, err error) {
+	assertData := func(res *Result, err error) {
 		if err != nil {
 			t.Fatalf("assert data: %v", err)
 		}
-
-		cfg, _, err := image.DecodeConfig(bytes.NewReader(d))
+		if res == nil || res.Primary == nil {
+			t.Fatalf("missing result")
+		}
+		cfg, _, err := image.DecodeConfig(bytes.NewReader(res.Primary))
 		if err != nil {
 			t.Fatalf("decode config: %v", err)
 		}
@@ -34,23 +36,27 @@ func TestResizeJPEGBatchMatchesSingle(t *testing.T) {
 		{Width: 300, Height: 200, Quality: 92, Interpolation: InterpolationBilinear, KeepMeta: false, ReceiveResult: assertData},
 	}
 
-	err = ResizeJPEGBatch(data, specs)
+	err = ResizeSDR(f, specs...)
 	if err != nil {
 		t.Fatalf("batch resize: %v", err)
 	}
 }
 
-func TestResizeJPEGBatchInvalid(t *testing.T) {
-	data, err := os.ReadFile("testdata/sample_srgb.jpg")
+func TestResizeSDRBatchInvalid(t *testing.T) {
+	f, err := os.Open("testdata/sample_srgb.jpg")
 	if err != nil {
-		t.Fatalf("read sample: %v", err)
+		t.Fatalf("open sample: %v", err)
 	}
 
-	if err := ResizeJPEGBatch(data, nil); err == nil {
+	if err := ResizeSDR(f); err == nil {
 		t.Fatal("expected error for empty specs")
 	}
 
-	if err := ResizeJPEGBatch(data, []ResizeSpec{{Width: 0, Height: 100, Quality: 80}}); err == nil {
+	f, err = os.Open("testdata/sample_srgb.jpg")
+	if err != nil {
+		t.Fatalf("open sample: %v", err)
+	}
+	if err := ResizeSDR(f, ResizeSpec{Width: 0, Height: 100, Quality: 80}); err == nil {
 		t.Fatal("expected error for zero width")
 	}
 }

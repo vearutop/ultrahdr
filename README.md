@@ -87,10 +87,14 @@ uhdrtool detect -in testdata/uhdr.jpg
 
 ## Resizing
 
-Primary image interpolation is built in. Set `ResizeOptions.Interpolation` to one of
+Primary image interpolation is built in. Set `ResizeSpec.Interpolation` to one of
 `InterpolationNearest`, `InterpolationBilinear`, `InterpolationBicubic`,
 `InterpolationMitchellNetravali`, `InterpolationLanczos2`, or `InterpolationLanczos3`. Gainmap
 resizing uses the same interpolation mode.
+
+`ResizeHDR` and `ResizeSDR` accept one or more `ResizeSpec` entries and deliver outputs via
+`ReceiveResult`. `ResizeHDR` also supports `ReceiveSplit` to inspect container metadata before
+resizing.
 
 ## Compatibility
 
@@ -117,30 +121,59 @@ ok, err := ultrahdr.IsUltraHDR(f)
 // ok == true means the file looks like a valid UltraHDR JPEG/R container.
 ```
 
-## ResizeJPEG (SDR)
+## ResizeSDR
 
 ```go
-data, err := os.ReadFile("input.jpg")
+f, err := os.Open("input.jpg")
 if err != nil {
 	// handle error
 }
-resized, err := ultrahdr.ResizeJPEG(data, 1600, 1200, 85, ultrahdr.InterpolationLanczos2, true)
+defer f.Close()
+var resized *ultrahdr.Result
+err := ultrahdr.ResizeSDR(f, ultrahdr.ResizeSpec{
+  Width:         1600,
+  Height:        1200,
+  Quality:       85,
+  Interpolation: ultrahdr.InterpolationLanczos2,
+  KeepMeta:      true,
+  ReceiveResult: func(res *ultrahdr.Result, err error) { resized = res },
+})
 if err != nil {
 	// handle error
 }
-_ = os.WriteFile("output.jpg", resized, 0o644)
+_ = os.WriteFile("output.jpg", resized.Primary, 0o644)
 ```
 
-`ResizeJPEG` behavior:
-- `keepMeta=true`: preserves EXIF/ICC (including Display P3 and Adobe RGB profiles).
-- `keepMeta=false`: strips metadata and converts Display P3/Adobe RGB input to sRGB pixels for
+`ResizeSDR` behavior:
+- `KeepMeta=true`: preserves EXIF/ICC (including Display P3 and Adobe RGB profiles).
+- `KeepMeta=false`: strips metadata and converts Display P3/Adobe RGB input to sRGB pixels for
   web-safe output.
 
 Batch resize API:
-- `ResizeJPEGBatch` accepts multiple `ResizeJPEGSpec` entries and performs a single source decode.
-- Returns `[]ResizeJPEGResult` (`Spec` + `Data`) to avoid index-only output handling.
-- Reuses resized/converted intermediate images across variants (for example, multiple qualities at
-  the same dimensions).
+- `ResizeSDR` accepts multiple `ResizeSpec` entries and performs a single source decode.
+- Each spec receives a result via its `ReceiveResult` callback.
+- Resized/converted intermediate images are reused across variants (for example, multiple qualities
+  at the same dimensions).
+
+## Join
+
+```go
+primary, _ := os.ReadFile("primary.jpg")
+gainmap, _ := os.ReadFile("gainmap.jpg")
+container, err := ultrahdr.Join(primary, gainmap, nil, nil)
+if err != nil {
+  // handle error
+}
+_ = os.WriteFile("out.jpg", container, 0o644)
+```
+
+If you have a split result, you can reuse its metadata:
+
+```go
+f, _ := os.Open("template.jpg")
+split, _ := ultrahdr.Split(f)
+container, _ := ultrahdr.Join(primary, gainmap, nil, split)
+```
 
 ## Limitations
 
@@ -148,6 +181,6 @@ Batch resize API:
 - HDR image input is assumed to be linear RGB relative to SDR white.
 - Gain map sampling uses nearest-neighbor.
 - Only XMP + ISO 21496-1 gain map metadata are generated.
-- `ResizeJPEG` metadata preservation is limited to EXIF and ICC segments (XMP is not preserved).
+- `ResizeSDR` metadata preservation is limited to EXIF and ICC segments (XMP is not preserved).
 - Full ICC color management is not implemented; only sRGB/Display P3/Adobe RGB primary profile
-  handling is applied in rebase and metadata-stripped ResizeJPEG output.
+  handling is applied in rebase and metadata-stripped ResizeSDR output.

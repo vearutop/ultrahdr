@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"image"
 	"os"
-	"path/filepath"
 
 	"github.com/vearutop/ultrahdr"
 )
@@ -61,6 +60,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  split  -in input.jpg -primary-out primary.jpg -gainmap-out gainmap.jpg [-meta-out meta.json]")
 	fmt.Fprintln(os.Stderr, "  join   -meta meta.json -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
 	fmt.Fprintln(os.Stderr, "        (or) join -template input.jpg -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
+	fmt.Fprintln(os.Stderr, "        (or) join -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
 	fmt.Fprintln(os.Stderr, "  gmstats -in gainmap.jpg")
 }
 
@@ -82,29 +82,59 @@ func runResize(args []string) error {
 	if *inPath == "" || *outPath == "" || *width <= 0 || *height <= 0 {
 		return errors.New("missing required arguments")
 	}
-	return ultrahdr.ResizeUltraHDRFile(*inPath, *outPath, *width, *height, func(opt *ultrahdr.ResizeOptions) {
-		opt.PrimaryQuality = *q
-		opt.GainmapQuality = *gq
-		opt.PrimaryOut = *primaryOut
-		opt.GainmapOut = *gainmapOut
-
-		interpMode := ultrahdr.InterpolationNearest
-		switch *interp {
-		case "nearest":
-			interpMode = ultrahdr.InterpolationNearest
-		case "bilinear":
-			interpMode = ultrahdr.InterpolationBilinear
-		case "bicubic":
-			interpMode = ultrahdr.InterpolationBicubic
-		case "mitchell":
-			interpMode = ultrahdr.InterpolationMitchellNetravali
-		case "lanczos2":
-			interpMode = ultrahdr.InterpolationLanczos2
-		case "lanczos3":
-			interpMode = ultrahdr.InterpolationLanczos3
-		}
-		opt.Interpolation = interpMode
+	f, err := os.Open(*inPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	interpMode := ultrahdr.InterpolationNearest
+	switch *interp {
+	case "nearest":
+		interpMode = ultrahdr.InterpolationNearest
+	case "bilinear":
+		interpMode = ultrahdr.InterpolationBilinear
+	case "bicubic":
+		interpMode = ultrahdr.InterpolationBicubic
+	case "mitchell":
+		interpMode = ultrahdr.InterpolationMitchellNetravali
+	case "lanczos2":
+		interpMode = ultrahdr.InterpolationLanczos2
+	case "lanczos3":
+		interpMode = ultrahdr.InterpolationLanczos3
+	}
+	var resized *ultrahdr.Result
+	err = ultrahdr.ResizeHDR(f, ultrahdr.ResizeSpec{
+		Width:          *width,
+		Height:         *height,
+		Quality:        *q,
+		GainmapQuality: *gq,
+		Interpolation:  interpMode,
+		ReceiveResult: func(res *ultrahdr.Result, err error) {
+			if err == nil {
+				resized = res
+			}
+		},
 	})
+	if err != nil {
+		return err
+	}
+	if resized == nil {
+		return errors.New("resize produced no output")
+	}
+	if err := os.WriteFile(*outPath, resized.Container, 0o644); err != nil {
+		return err
+	}
+	if *primaryOut != "" {
+		if err := os.WriteFile(*primaryOut, resized.Primary, 0o644); err != nil {
+			return err
+		}
+	}
+	if *gainmapOut != "" {
+		if err := os.WriteFile(*gainmapOut, resized.Gainmap, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func runRebase(args []string) error {
@@ -122,9 +152,18 @@ func runRebase(args []string) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	opts := &ultrahdr.RebaseOptions{
-		BaseQuality:    *q,
-		GainmapQuality: *gq,
+	var opts []ultrahdr.RebaseOption
+	if *q > 0 {
+		opts = append(opts, ultrahdr.WithBaseQuality(*q))
+	}
+	if *gq > 0 {
+		opts = append(opts, ultrahdr.WithGainmapQuality(*gq))
+	}
+	if *primaryOut != "" {
+		opts = append(opts, ultrahdr.WithPrimaryOut(*primaryOut))
+	}
+	if *gainmapOut != "" {
+		opts = append(opts, ultrahdr.WithGainmapOut(*gainmapOut))
 	}
 	if *exrPath != "" && *tiffPath != "" {
 		return errors.New("use only one of -exr or -tiff")
@@ -133,18 +172,18 @@ func runRebase(args []string) error {
 		if *primaryPath == "" || *outPath == "" {
 			return errors.New("missing required arguments")
 		}
-		return ultrahdr.RebaseUltraHDRFromEXRFile(*primaryPath, *exrPath, *outPath, opts, *primaryOut, *gainmapOut)
+		return ultrahdr.RebaseFromEXRFile(*primaryPath, *exrPath, *outPath, opts...)
 	}
 	if *tiffPath != "" {
 		if *primaryPath == "" || *outPath == "" {
 			return errors.New("missing required arguments")
 		}
-		return ultrahdr.RebaseUltraHDRFromTIFFFile(*primaryPath, *tiffPath, *outPath, opts, *primaryOut, *gainmapOut)
+		return ultrahdr.RebaseFromTIFFFile(*primaryPath, *tiffPath, *outPath, opts...)
 	}
 	if *inPath == "" || *primaryPath == "" || *outPath == "" {
 		return errors.New("missing required arguments")
 	}
-	return ultrahdr.RebaseUltraHDRFile(*inPath, *primaryPath, *outPath, opts, *primaryOut, *gainmapOut)
+	return ultrahdr.RebaseFile(*inPath, *primaryPath, *outPath, opts...)
 }
 
 func runDetect(args []string) error {
@@ -157,7 +196,7 @@ func runDetect(args []string) error {
 	if *inPath == "" {
 		return errors.New("missing required arguments")
 	}
-	f, err := os.Open(filepath.Clean(*inPath))
+	f, err := os.Open(*inPath)
 	if err != nil {
 		return err
 	}
@@ -187,22 +226,23 @@ func runSplit(args []string) error {
 	if *inPath == "" || *primaryOut == "" || *gainmapOut == "" {
 		return errors.New("missing required arguments")
 	}
-	data, err := os.ReadFile(filepath.Clean(*inPath))
+	f, err := os.Open(*inPath)
 	if err != nil {
 		return err
 	}
-	split, err := ultrahdr.Split(data)
+	defer f.Close()
+	split, err := ultrahdr.Split(f)
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*primaryOut), split.PrimaryJPEG, 0o644); err != nil {
+	if err := os.WriteFile(*primaryOut, split.Primary, 0o644); err != nil {
 		return err
 	}
-	if err := os.WriteFile(filepath.Clean(*gainmapOut), split.GainmapJPEG, 0o644); err != nil {
+	if err := os.WriteFile(*gainmapOut, split.Gainmap, 0o644); err != nil {
 		return err
 	}
 	if *metaOut != "" {
-		bundle, err := ultrahdr.BuildMetadataBundle(split.PrimaryJPEG, split.Segs)
+		bundle, err := split.BuildMetadataBundle()
 		if err != nil {
 			return err
 		}
@@ -210,7 +250,7 @@ func runSplit(args []string) error {
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(filepath.Clean(*metaOut), payload, 0o644); err != nil {
+		if err := os.WriteFile(*metaOut, payload, 0o644); err != nil {
 			return err
 		}
 	}
@@ -231,16 +271,16 @@ func runJoin(args []string) error {
 	if *primaryPath == "" || *gainmapPath == "" || *outPath == "" {
 		return errors.New("missing required arguments")
 	}
-	primary, err := os.ReadFile(filepath.Clean(*primaryPath))
+	primary, err := os.ReadFile(*primaryPath)
 	if err != nil {
 		return err
 	}
-	gainmap, err := os.ReadFile(filepath.Clean(*gainmapPath))
+	gainmap, err := os.ReadFile(*gainmapPath)
 	if err != nil {
 		return err
 	}
 	if *metaPath != "" {
-		metaData, err := os.ReadFile(filepath.Clean(*metaPath))
+		metaData, err := os.ReadFile(*metaPath)
 		if err != nil {
 			return err
 		}
@@ -248,38 +288,33 @@ func runJoin(args []string) error {
 		if err := json.Unmarshal(metaData, &bundle); err != nil {
 			return err
 		}
-		container, err := ultrahdr.AssembleFromBundle(primary, gainmap, &bundle)
+		container, err := ultrahdr.Join(primary, gainmap, &bundle, nil)
 		if err != nil {
 			return err
 		}
-		return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
+		return os.WriteFile(*outPath, container, 0o644)
 	}
 	if *templatePath == "" {
-		return errors.New("missing -meta or -template")
+		container, err := ultrahdr.Join(primary, gainmap, nil, nil)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(*outPath, container, 0o644)
 	}
-	template, err := os.ReadFile(filepath.Clean(*templatePath))
+	template, err := os.Open(*templatePath)
 	if err != nil {
 		return err
 	}
+	defer template.Close()
 	split, err := ultrahdr.Split(template)
 	if err != nil {
 		return err
 	}
-	exif, icc, err := ultrahdr.ExtractEXIFAndICC(primary)
+	container, err := ultrahdr.Join(primary, gainmap, nil, split)
 	if err != nil {
 		return err
 	}
-	if len(exif) == 0 && len(icc) == 0 {
-		exif, icc, err = ultrahdr.ExtractEXIFAndICC(template)
-		if err != nil {
-			return err
-		}
-	}
-	container, err := ultrahdr.AssembleContainer(primary, gainmap, exif, icc, split.Segs.SecondaryXMP, split.Segs.SecondaryISO)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Clean(*outPath), container, 0o644)
+	return os.WriteFile(*outPath, container, 0o644)
 }
 
 func runGainmapStats(args []string) error {
@@ -292,7 +327,7 @@ func runGainmapStats(args []string) error {
 	if *inPath == "" {
 		return errors.New("missing required arguments")
 	}
-	data, err := os.ReadFile(filepath.Clean(*inPath))
+	data, err := os.ReadFile(*inPath)
 	if err != nil {
 		return err
 	}

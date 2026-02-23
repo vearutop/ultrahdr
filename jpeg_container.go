@@ -330,55 +330,6 @@ func extractAppSegments(jpegData []byte) (app1 [][]byte, app2 [][]byte, err erro
 	return app1, app2, nil
 }
 
-// extractContainerHeaderSegments returns APP1/APP2 payloads in the container header up to MPF.
-func extractContainerHeaderSegments(data []byte) (app1 [][]byte, app2 [][]byte, err error) {
-	if len(data) < 4 || data[0] != markerStart || data[1] != markerSOI {
-		return nil, nil, errors.New("invalid jpeg")
-	}
-	pos := 2
-	for pos+3 < len(data) {
-		if data[pos] != markerStart {
-			pos++
-			continue
-		}
-		for pos < len(data) && data[pos] == markerStart {
-			pos++
-		}
-		if pos >= len(data) {
-			break
-		}
-		marker := data[pos]
-		pos++
-		if marker == markerSOS || marker == markerEOI {
-			break
-		}
-		if marker >= 0xD0 && marker <= 0xD7 {
-			continue
-		}
-		if pos+1 >= len(data) {
-			return nil, nil, errors.New("truncated marker")
-		}
-		segLen := int(binary.BigEndian.Uint16(data[pos:]))
-		if segLen < 2 || pos+segLen > len(data) {
-			return nil, nil, errors.New("invalid segment length")
-		}
-		segStart := pos + 2
-		segEnd := pos + segLen
-		payload := append([]byte(nil), data[segStart:segEnd]...)
-		switch marker {
-		case markerAPP1:
-			app1 = append(app1, payload)
-		case markerAPP2:
-			app2 = append(app2, payload)
-			if bytes.HasPrefix(payload, mpfSig) {
-				return app1, app2, nil
-			}
-		}
-		pos = segEnd
-	}
-	return app1, app2, nil
-}
-
 func findXMP(app1 [][]byte) []byte {
 	for _, seg := range app1 {
 		if bytes.HasPrefix(seg, append([]byte(xmpNamespace), 0)) {

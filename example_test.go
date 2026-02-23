@@ -2,13 +2,12 @@ package ultrahdr_test
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/vearutop/ultrahdr"
 )
 
 func ExampleIsUltraHDR() {
-	f, err := os.Open(filepath.FromSlash("testdata/uhdr.jpg"))
+	f, err := os.Open("testdata/uhdr.jpg")
 	if err != nil {
 		return
 	}
@@ -18,48 +17,59 @@ func ExampleIsUltraHDR() {
 }
 
 func ExampleSplit_joinWithBundle() {
-	data, err := os.ReadFile(filepath.FromSlash("testdata/uhdr.jpg"))
+	f, err := os.Open("testdata/uhdr.jpg")
 	if err != nil {
 		return
 	}
-	sr, err := ultrahdr.Split(data)
+	defer f.Close()
+	sr, err := ultrahdr.Split(f)
 	if err != nil {
 		return
 	}
-	bundle, err := ultrahdr.BuildMetadataBundle(sr.PrimaryJPEG, sr.Segs)
+	bundle, err := sr.BuildMetadataBundle()
 	if err != nil {
 		return
 	}
-	_, _ = ultrahdr.AssembleFromBundle(sr.PrimaryJPEG, sr.GainmapJPEG, bundle)
+	_, _ = ultrahdr.Join(sr.Primary, sr.Gainmap, bundle, nil)
 }
 
-func ExampleResizeUltraHDR() {
-	data, err := os.ReadFile(filepath.FromSlash("testdata/uhdr.jpg"))
+func ExampleResizeHDR() {
+	f, err := os.Open("testdata/uhdr.jpg")
 	if err != nil {
 		return
 	}
-	_, _ = ultrahdr.ResizeUltraHDR(data, 2400, 1600)
+	defer f.Close()
+	_ = ultrahdr.ResizeHDR(f, ultrahdr.ResizeSpec{
+		Width:  2400,
+		Height: 1600,
+	})
 }
 
-func ExampleResizeJPEG() {
-	data, err := os.ReadFile(filepath.FromSlash("testdata/sample_srgb.jpg"))
+func ExampleResizeSDR() {
+	f, err := os.Open("testdata/sample_srgb.jpg")
 	if err != nil {
 		return
 	}
-	_, _ = ultrahdr.ResizeJPEG(data, 800, 600, 85, ultrahdr.InterpolationLanczos2, true)
+	_ = ultrahdr.ResizeSDR(f, ultrahdr.ResizeSpec{
+		Width:         800,
+		Height:        600,
+		Quality:       85,
+		Interpolation: ultrahdr.InterpolationLanczos2,
+		KeepMeta:      true,
+	})
 }
 
-func ExampleResizeJPEGBatch() {
-	data, err := os.ReadFile(filepath.FromSlash("testdata/sample_display_p3.jpg"))
+func ExampleResizeSDR_multi() {
+	f, err := os.Open("testdata/sample_display_p3.jpg")
 	if err != nil {
 		return
 	}
 	specs := []ultrahdr.ResizeSpec{
-		{Width: 1200, Height: 800, Quality: 85, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: true, ReceiveResult: func(d []byte, err error) { _ = d }},
-		{Width: 600, Height: 400, Quality: 82, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(d []byte, err error) { _ = d }},
-		{Width: 300, Height: 200, Quality: 78, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(d []byte, err error) { _ = d }},
+		{Width: 1200, Height: 800, Quality: 85, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: true, ReceiveResult: func(res *ultrahdr.Result, err error) { _ = res }},
+		{Width: 600, Height: 400, Quality: 82, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(res *ultrahdr.Result, err error) { _ = res }},
+		{Width: 300, Height: 200, Quality: 78, Interpolation: ultrahdr.InterpolationLanczos2, KeepMeta: false, ReceiveResult: func(res *ultrahdr.Result, err error) { _ = res }},
 	}
-	err = ultrahdr.ResizeJPEGBatch(data, specs)
+	err = ultrahdr.ResizeSDR(f, specs...)
 	if err != nil {
 		return
 	}
