@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"image/color"
 	"image/draw"
 	"io"
 	"math"
@@ -13,6 +14,7 @@ import (
 type GridOptions struct {
 	Quality       int           // JPEG quality for the output (0 uses default).
 	Interpolation Interpolation // Resize interpolation mode.
+	Background    color.Color   // Background fill color (nil uses black).
 }
 
 // Grid builds a sprite grid from SDR images. Inputs are resized to fit each cell
@@ -43,6 +45,11 @@ func Grid(readers []io.Reader, cols int, cellW, cellH int, opts *GridOptions) (*
 	gridW := cols * cellW
 	gridH := rows * cellH
 	grid := image.NewNRGBA(image.Rect(0, 0, gridW, gridH))
+	bg := color.NRGBA{A: 0xFF}
+	if opts != nil && opts.Background != nil {
+		bg = color.NRGBAModel.Convert(opts.Background).(color.NRGBA)
+	}
+	draw.Draw(grid, grid.Bounds(), &image.Uniform{C: bg}, image.Point{}, draw.Src)
 
 	for idx, r := range readers {
 		if r == nil {

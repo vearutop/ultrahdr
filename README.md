@@ -115,6 +115,7 @@ for _, p := range files {
 res, err := ultrahdr.Grid(readers, 2, 400, 300, &ultrahdr.GridOptions{
 	Quality:       85,
 	Interpolation: ultrahdr.InterpolationLanczos2,
+	Background:    color.Black,
 })
 if err != nil {
 	// handle error

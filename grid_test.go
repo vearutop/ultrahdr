@@ -3,6 +3,7 @@ package ultrahdr
 import (
 	"bytes"
 	"image"
+	"image/color"
 	"io"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ func TestGridSDR(t *testing.T) {
 	res, err := Grid(readers, 2, 400, 300, &GridOptions{
 		Quality:       85,
 		Interpolation: InterpolationLanczos2,
+		Background:    color.White,
 	})
 	if err != nil {
 		t.Fatalf("grid: %v", err)

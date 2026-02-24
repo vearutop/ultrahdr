@@ -2,6 +2,7 @@ package ultrahdr_test
 
 import (
 	"image"
+	"image/color"
 	"io"
 	"os"
 
@@ -97,5 +98,6 @@ func ExampleGrid() {
 	_, _ = ultrahdr.Grid(readers, 2, 400, 300, &ultrahdr.GridOptions{
 		Quality:       85,
 		Interpolation: ultrahdr.InterpolationLanczos2,
+		Background:    color.Black,
 	})
 }
