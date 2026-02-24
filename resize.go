@@ -138,7 +138,10 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 			interp = spec.Interpolation
 		}
 
-		primaryThumbImg := resizeImageInterpolated(primaryCropped, int(width), int(height), interp)
+		primaryThumbImg := primaryCropped
+		if primaryCropRect.Dx() != int(width) || primaryCropRect.Dy() != int(height) {
+			primaryThumbImg = resizeImageInterpolated(primaryCropped, int(width), int(height), interp)
+		}
 		primaryThumb, err := encodeWithQuality(primaryThumbImg, primaryQuality)
 		if err != nil {
 			if spec.ReceiveResult != nil {
@@ -146,7 +149,10 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 			}
 			return fmt.Errorf("resize primary: %w", err)
 		}
-		gainmapThumbImg := resizeImageInterpolated(gainmapCropped, int(width), int(height), interp)
+		gainmapThumbImg := gainmapCropped
+		if gainmapCropRect.Dx() != int(width) || gainmapCropRect.Dy() != int(height) {
+			gainmapThumbImg = resizeImageInterpolated(gainmapCropped, int(width), int(height), interp)
+		}
 		gainmapThumb, err := encodeWithQuality(gainmapThumbImg, gainmapQuality)
 		if err != nil {
 			if spec.ReceiveResult != nil {
@@ -245,7 +251,10 @@ func ResizeSDR(r io.Reader, specs ...ResizeSpec) error {
 			spec.Quality = defaultPrimaryQuality
 		}
 
-		resized := resizeImageInterpolated(cropped, int(width), int(height), spec.Interpolation)
+		resized := cropped
+		if cropRect.Dx() != int(width) || cropRect.Dy() != int(height) {
+			resized = resizeImageInterpolated(cropped, int(width), int(height), spec.Interpolation)
+		}
 
 		dstProfile := srcProfile
 		var segs []appSegment

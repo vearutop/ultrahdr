@@ -151,11 +151,8 @@ _ = os.WriteFile("output.jpg", resized.Primary, 0o644)
 - `KeepMeta=false`: strips metadata and converts Display P3/Adobe RGB input to sRGB pixels for
   web-safe output.
 
-Batch resize API:
 - `ResizeSDR` accepts multiple `ResizeSpec` entries and performs a single source decode.
 - Each spec receives a result via its `ReceiveResult` callback.
-- Resized/converted intermediate images are reused across variants (for example, multiple qualities
-  at the same dimensions).
 
 
 ## Join
