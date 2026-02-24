@@ -1,6 +1,9 @@
 package ultrahdr_test
 
 import (
+	"image"
+	"image/color"
+	"io"
 	"os"
 
 	"github.com/vearutop/ultrahdr"
@@ -50,9 +53,11 @@ func ExampleResizeSDR() {
 	if err != nil {
 		return
 	}
+	crop := image.Rect(120, 80, 920, 680)
 	_ = ultrahdr.ResizeSDR(f, ultrahdr.ResizeSpec{
 		Width:         800,
 		Height:        600,
+		Crop:          &crop,
 		Quality:       85,
 		Interpolation: ultrahdr.InterpolationLanczos2,
 		KeepMeta:      true,
@@ -73,4 +78,26 @@ func ExampleResizeSDR_multi() {
 	if err != nil {
 		return
 	}
+}
+
+func ExampleGrid() {
+	paths := []string{
+		"testdata/sample_srgb.jpg",
+		"testdata/sample_display_p3.jpg",
+		"testdata/sample_adobe_rgb.jpg",
+	}
+	readers := make([]io.Reader, 0, len(paths))
+	for _, p := range paths {
+		f, err := os.Open(p)
+		if err != nil {
+			return
+		}
+		defer f.Close()
+		readers = append(readers, f)
+	}
+	_, _ = ultrahdr.Grid(readers, 2, 400, 300, &ultrahdr.GridOptions{
+		Quality:       85,
+		Interpolation: ultrahdr.InterpolationLanczos2,
+		Background:    color.Black,
+	})
 }

@@ -4,3 +4,6 @@ uhdr_*
 *.prim.jpg
 resizejpeg_*.jpg
 *.uhdr.jpg
+uhdr_crop*
+generated/*_crop*.jpg
+generated/grid_*.jpg
