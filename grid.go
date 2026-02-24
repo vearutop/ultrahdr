@@ -12,9 +12,10 @@ import (
 
 // GridOptions configures grid rendering for SDR inputs.
 type GridOptions struct {
-	Quality       int           // JPEG quality for the output (0 uses default).
-	Interpolation Interpolation // Resize interpolation mode.
-	Background    color.Color   // Background fill color (nil uses black).
+	Quality         int           // JPEG quality for the output (0 uses default).
+	Interpolation   Interpolation // Resize interpolation mode.
+	Background      color.Color   // Background fill color (nil uses black).
+	ReceivePosition func(i int, top, left uint, width, height uint)
 }
 
 // Grid builds a sprite grid from SDR images. Inputs are resized to fit each cell
@@ -81,6 +82,9 @@ func Grid(readers []io.Reader, cols int, cellW, cellH int, opts *GridOptions) (*
 		row := idx / cols
 		x0 := col*cellW + (cellW-w)/2
 		y0 := row*cellH + (cellH-h)/2
+		if opts != nil && opts.ReceivePosition != nil {
+			opts.ReceivePosition(idx, uint(y0), uint(x0), uint(w), uint(h))
+		}
 		dstRect := image.Rect(x0, y0, x0+w, y0+h)
 		draw.Draw(grid, dstRect, resized, resized.Bounds().Min, draw.Src)
 
