@@ -98,6 +98,30 @@ resizing.
 `ResizeSpec.Crop` optionally crops the source before resizing (for UltraHDR, the gainmap is cropped
 to the corresponding region automatically).
 
+## Grid
+
+```go
+files := []string{
+	"testdata/sample_srgb.jpg",
+	"testdata/sample_display_p3.jpg",
+	"testdata/sample_adobe_rgb.jpg",
+}
+readers := make([]io.Reader, 0, len(files))
+for _, p := range files {
+	f, _ := os.Open(p)
+	defer f.Close()
+	readers = append(readers, f)
+}
+res, err := ultrahdr.Grid(readers, 2, 400, 300, &ultrahdr.GridOptions{
+	Quality:       85,
+	Interpolation: ultrahdr.InterpolationLanczos2,
+})
+if err != nil {
+	// handle error
+}
+_ = os.WriteFile("grid.jpg", res.Primary, 0o644)
+```
+
 ## Compatibility
 
 - Google Pixel UltraHDR JPEG/R files that store gainmap metadata in XMP only (no secondary ISO
