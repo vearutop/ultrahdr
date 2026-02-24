@@ -107,3 +107,81 @@ func TestGridHDR(t *testing.T) {
 		t.Fatalf("write gainmap: %v", err)
 	}
 }
+
+func TestGridReceivePosition(t *testing.T) {
+	paths := []string{
+		"testdata/sample_srgb.jpg",
+		"testdata/sample_display_p3.jpg",
+		"testdata/sample_adobe_rgb.jpg",
+	}
+	const (
+		cols  = 2
+		cellW = 400
+		cellH = 300
+	)
+
+	type pos struct {
+		i      int
+		top    uint
+		left   uint
+		width  uint
+		height uint
+	}
+
+	readers := make([]io.Reader, 0, len(paths))
+	decoded := make([]image.Image, 0, len(paths))
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("read %s: %v", p, err)
+		}
+		img, _, err := image.Decode(bytes.NewReader(data))
+		if err != nil {
+			t.Fatalf("decode %s: %v", p, err)
+		}
+		readers = append(readers, bytes.NewReader(data))
+		decoded = append(decoded, img)
+	}
+
+	got := make([]pos, 0, len(paths))
+	_, err := Grid(readers, cols, cellW, cellH, &GridOptions{
+		ReceivePosition: func(i int, top, left uint, width, height uint) {
+			got = append(got, pos{
+				i:      i,
+				top:    top,
+				left:   left,
+				width:  width,
+				height: height,
+			})
+		},
+	})
+	if err != nil {
+		t.Fatalf("grid: %v", err)
+	}
+
+	if len(got) != len(paths) {
+		t.Fatalf("unexpected positions count: got %d want %d", len(got), len(paths))
+	}
+
+	for i := range decoded {
+		_, w, h := resizeToFit(decoded[i], cellW, cellH, InterpolationLanczos2)
+		col := i % cols
+		row := i / cols
+		wantLeft := uint(col*cellW + (cellW-w)/2)
+		wantTop := uint(row*cellH + (cellH-h)/2)
+		wantWidth := uint(w)
+		wantHeight := uint(h)
+
+		if got[i].i != i {
+			t.Fatalf("position[%d] unexpected index: got %d want %d", i, got[i].i, i)
+		}
+		if got[i].top != wantTop || got[i].left != wantLeft || got[i].width != wantWidth || got[i].height != wantHeight {
+			t.Fatalf(
+				"position[%d] mismatch: got (top=%d left=%d width=%d height=%d), want (top=%d left=%d width=%d height=%d)",
+				i,
+				got[i].top, got[i].left, got[i].width, got[i].height,
+				wantTop, wantLeft, wantWidth, wantHeight,
+			)
+		}
+	}
+}
