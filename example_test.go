@@ -1,6 +1,7 @@
 package ultrahdr_test
 
 import (
+	"image"
 	"os"
 
 	"github.com/vearutop/ultrahdr"
@@ -50,9 +51,11 @@ func ExampleResizeSDR() {
 	if err != nil {
 		return
 	}
+	crop := image.Rect(120, 80, 920, 680)
 	_ = ultrahdr.ResizeSDR(f, ultrahdr.ResizeSpec{
 		Width:         800,
 		Height:        600,
+		Crop:          &crop,
 		Quality:       85,
 		Interpolation: ultrahdr.InterpolationLanczos2,
 		KeepMeta:      true,

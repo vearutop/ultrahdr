@@ -17,6 +17,7 @@ import (
 type ResizeSpec struct {
 	Width          uint                         // Target width in pixels.
 	Height         uint                         // Target height in pixels.
+	Crop           *image.Rectangle             // Optional crop rectangle in source pixels.
 	Quality        int                          // SDR/primary JPEG quality (0 uses default).
 	GainmapQuality int                          // Gainmap JPEG quality for HDR resize (0 uses default or Quality).
 	Interpolation  Interpolation                // Resize interpolation mode for SDR and HDR paths.
@@ -52,10 +53,15 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 	if sr.Meta == nil {
 		return errors.New("gainmap metadata missing")
 	}
-	srcW := primaryImg.Bounds().Dx()
-	srcH := primaryImg.Bounds().Dy()
+	primaryBounds := primaryImg.Bounds()
+	srcW := primaryBounds.Dx()
+	srcH := primaryBounds.Dy()
 	if srcW <= 0 || srcH <= 0 {
 		return errors.New("invalid source dimensions")
+	}
+	gainmapBounds := gainmapImg.Bounds()
+	if gainmapBounds.Dx() <= 0 || gainmapBounds.Dy() <= 0 {
+		return errors.New("invalid gainmap dimensions")
 	}
 	for _, spec := range specs {
 		if spec.ReceiveSplit != nil {
@@ -76,7 +82,40 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 	}
 
 	for _, spec := range specs {
-		width, height, err := resolveResizeDims(spec, srcW, srcH)
+		cropRect := primaryBounds
+		if spec.Crop != nil {
+			cropRect = *spec.Crop
+			if err := validateCropRect(cropRect, primaryBounds); err != nil {
+				if spec.ReceiveResult != nil {
+					spec.ReceiveResult(nil, err)
+				}
+				return err
+			}
+		}
+		primaryCropRect, gainmapCropRect, err := resolveCropRects(cropRect, primaryBounds, gainmapBounds)
+		if err != nil {
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return err
+		}
+
+		primaryCropped, err := cropImage(primaryImg, primaryCropRect)
+		if err != nil {
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return fmt.Errorf("crop primary: %w", err)
+		}
+		gainmapCropped, err := cropImage(gainmapImg, gainmapCropRect)
+		if err != nil {
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return fmt.Errorf("crop gainmap: %w", err)
+		}
+
+		width, height, err := resolveResizeDims(spec, primaryCropRect.Dx(), primaryCropRect.Dy())
 		if err != nil {
 			if spec.ReceiveResult != nil {
 				spec.ReceiveResult(nil, err)
@@ -99,7 +138,7 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 			interp = spec.Interpolation
 		}
 
-		primaryThumbImg := resizeImageInterpolated(primaryImg, int(width), int(height), interp)
+		primaryThumbImg := resizeImageInterpolated(primaryCropped, int(width), int(height), interp)
 		primaryThumb, err := encodeWithQuality(primaryThumbImg, primaryQuality)
 		if err != nil {
 			if spec.ReceiveResult != nil {
@@ -107,7 +146,7 @@ func ResizeHDR(r io.Reader, specs ...ResizeSpec) error {
 			}
 			return fmt.Errorf("resize primary: %w", err)
 		}
-		gainmapThumbImg := resizeImageInterpolated(gainmapImg, int(width), int(height), interp)
+		gainmapThumbImg := resizeImageInterpolated(gainmapCropped, int(width), int(height), interp)
 		gainmapThumb, err := encodeWithQuality(gainmapThumbImg, gainmapQuality)
 		if err != nil {
 			if spec.ReceiveResult != nil {
@@ -169,28 +208,33 @@ func ResizeSDR(r io.Reader, specs ...ResizeSpec) error {
 	if err != nil {
 		return err
 	}
-	srcW := srcImg.Bounds().Dx()
-	srcH := srcImg.Bounds().Dy()
+	srcBounds := srcImg.Bounds()
+	srcW := srcBounds.Dx()
+	srcH := srcBounds.Dy()
 	if srcW <= 0 || srcH <= 0 {
 		return errors.New("invalid source dimensions")
 	}
 
-	type resizedKey struct {
-		w      int
-		h      int
-		interp Interpolation
-	}
-	type convertedKey struct {
-		resizedKey
-
-		profile colorProfile
-	}
-
-	resizedCache := map[resizedKey]image.Image{}
-	convertedCache := map[convertedKey]image.Image{}
-
 	for _, spec := range specs {
-		width, height, err := resolveResizeDims(spec, srcW, srcH)
+		cropRect := srcBounds
+		if spec.Crop != nil {
+			cropRect = *spec.Crop
+			if err := validateCropRect(cropRect, srcBounds); err != nil {
+				if spec.ReceiveResult != nil {
+					spec.ReceiveResult(nil, err)
+				}
+				return err
+			}
+		}
+		cropped, err := cropImage(srcImg, cropRect)
+		if err != nil {
+			if spec.ReceiveResult != nil {
+				spec.ReceiveResult(nil, err)
+			}
+			return err
+		}
+
+		width, height, err := resolveResizeDims(spec, cropRect.Dx(), cropRect.Dy())
 		if err != nil {
 			if spec.ReceiveResult != nil {
 				spec.ReceiveResult(nil, err)
@@ -200,12 +244,8 @@ func ResizeSDR(r io.Reader, specs ...ResizeSpec) error {
 		if spec.Quality <= 0 {
 			spec.Quality = defaultPrimaryQuality
 		}
-		rk := resizedKey{w: int(width), h: int(height), interp: spec.Interpolation}
-		resized, ok := resizedCache[rk]
-		if !ok {
-			resized = resizeImageInterpolated(srcImg, rk.w, rk.h, rk.interp)
-			resizedCache[rk] = resized
-		}
+
+		resized := resizeImageInterpolated(cropped, int(width), int(height), spec.Interpolation)
 
 		dstProfile := srcProfile
 		var segs []appSegment
@@ -215,14 +255,9 @@ func ResizeSDR(r io.Reader, specs ...ResizeSpec) error {
 			dstProfile = colorProfile{gamut: colorGamutSRGB, transfer: colorTransferSRGB}
 		}
 
-		ck := convertedKey{resizedKey: rk, profile: dstProfile}
-		converted, ok := convertedCache[ck]
-		if !ok {
-			converted = resized
-			if dstProfile != srcProfile {
-				converted = convertImageProfile(converted, srcProfile, dstProfile)
-			}
-			convertedCache[ck] = converted
+		converted := resized
+		if dstProfile != srcProfile {
+			converted = convertImageProfile(converted, srcProfile, dstProfile)
 		}
 
 		out, err := encodeWithQuality(converted, spec.Quality)

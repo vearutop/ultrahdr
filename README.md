@@ -95,6 +95,8 @@ resizing uses the same interpolation mode.
 `ResizeHDR` and `ResizeSDR` accept one or more `ResizeSpec` entries and deliver outputs via
 `ReceiveResult`. `ResizeHDR` also supports `ReceiveSplit` to inspect container metadata before
 resizing.
+`ResizeSpec.Crop` optionally crops the source before resizing (for UltraHDR, the gainmap is cropped
+to the corresponding region automatically).
 
 ## Compatibility
 
@@ -154,6 +156,7 @@ Batch resize API:
 - Each spec receives a result via its `ReceiveResult` callback.
 - Resized/converted intermediate images are reused across variants (for example, multiple qualities
   at the same dimensions).
+
 
 ## Join
 
