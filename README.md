@@ -65,6 +65,12 @@ func main() {
 uhdrtool resize -in testdata/uhdr.jpg -out testdata/uhdr_thumb.jpg -w 2400 -h 1600 -q 85 -gq 75 \
   -primary-out testdata/uhdr_thumb_primary.jpg -gainmap-out testdata/uhdr_thumb_gainmap.jpg
 
+# crop (UltraHDR or SDR)
+uhdrtool crop -in testdata/uhdr.jpg -out testdata/uhdr_crop.jpg -x 200 -y 120 -w 1800 -h 1200 -q 85 -gq 75
+
+# grid (SDR or mixed, HDR grid when any input is UltraHDR)
+uhdrtool grid -cols 2 -cell-w 400 -cell-h 300 -out testdata/grid.jpg testdata/sample_*.jpg
+
 # split into components + metadata bundle
 uhdrtool split -in testdata/uhdr.jpg \
   -primary-out primary.jpg -gainmap-out gainmap.jpg -meta-out meta.json
@@ -122,6 +128,9 @@ if err != nil {
 }
 _ = os.WriteFile("grid.jpg", res.Primary, 0o644)
 ```
+
+When any input is UltraHDR, the grid output is encoded as UltraHDR with a synthesized gainmap.
+If all inputs are SDR, the grid output is a regular JPEG.
 
 ## Compatibility
 

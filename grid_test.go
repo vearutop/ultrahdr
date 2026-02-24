@@ -59,3 +59,51 @@ func TestGridSDR(t *testing.T) {
 		t.Fatalf("write output: %v", err)
 	}
 }
+
+func TestGridHDR(t *testing.T) {
+	paths := []string{
+		"testdata/small_uhdr.jpg",
+		"testdata/sample_srgb.jpg",
+	}
+
+	readers := make([]io.Reader, 0, len(paths))
+	files := make([]*os.File, 0, len(paths))
+	for _, p := range paths {
+		f, err := os.Open(p)
+		if err != nil {
+			t.Fatalf("open %s: %v", p, err)
+		}
+		files = append(files, f)
+		readers = append(readers, f)
+	}
+	for _, f := range files {
+		defer f.Close()
+	}
+
+	res, err := Grid(readers, 2, 400, 300, &GridOptions{
+		Quality:       85,
+		Interpolation: InterpolationLanczos2,
+	})
+	if err != nil {
+		t.Fatalf("grid: %v", err)
+	}
+	if res == nil || res.Container == nil || res.Primary == nil {
+		t.Fatalf("missing result")
+	}
+	if res.Gainmap == nil {
+		t.Fatalf("expected gainmap output")
+	}
+	if _, err := Split(bytes.NewReader(res.Container)); err != nil {
+		t.Fatalf("split grid container: %v", err)
+	}
+
+	if err := os.WriteFile("testdata/uhdr_grid.jpg", res.Container, 0o644); err != nil {
+		t.Fatalf("write container: %v", err)
+	}
+	if err := os.WriteFile("testdata/uhdr_grid_primary.jpg", res.Primary, 0o644); err != nil {
+		t.Fatalf("write primary: %v", err)
+	}
+	if err := os.WriteFile("testdata/uhdr_grid_gainmap.jpg", res.Gainmap, 0o644); err != nil {
+		t.Fatalf("write gainmap: %v", err)
+	}
+}
