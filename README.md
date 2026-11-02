@@ -78,6 +78,9 @@ uhdrtool split -in testdata/uhdr.jpg \
 # join without the original template
 uhdrtool join -meta meta.json -primary primary.jpg -gainmap gainmap.jpg -out out.jpg
 
+# join plain JPEGs (no gainmap metadata), e.g. a glow mask; white gainmap pixels get 4x (+2 stops) boost
+uhdrtool join -boost 4 -primary sdr.jpg -gainmap mask.jpg -out out.jpg
+
 # rebase on a better SDR (approximate gainmap adjustment)
 uhdrtool rebase -in testdata/uhdr.jpg -primary better_sdr.jpg -out better_uhdr.jpg
 
@@ -207,6 +210,12 @@ If you have a split result, you can reuse its metadata:
 f, _ := os.Open("template.jpg")
 split, _ := ultrahdr.Split(f)
 container, _ := ultrahdr.Join(primary, gainmap, nil, split)
+```
+
+If the gainmap is a plain JPEG without gain map metadata, provide the maximum content boost:
+
+```go
+container, _ := ultrahdr.JoinWithBoost(primary, gainmap, 4)
 ```
 
 ## Limitations

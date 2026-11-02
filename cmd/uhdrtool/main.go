@@ -72,6 +72,7 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  split  -in input.jpg -primary-out primary.jpg -gainmap-out gainmap.jpg [-meta-out meta.json]")
 	fmt.Fprintln(os.Stderr, "  join   -meta meta.json -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
 	fmt.Fprintln(os.Stderr, "        (or) join -template input.jpg -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
+	fmt.Fprintln(os.Stderr, "        (or) join -boost 4 -primary primary.jpg -gainmap plain_gainmap.jpg -out output.jpg")
 	fmt.Fprintln(os.Stderr, "        (or) join -primary primary.jpg -gainmap gainmap.jpg -out output.jpg")
 	fmt.Fprintln(os.Stderr, "  gmstats -in gainmap.jpg")
 }
@@ -428,6 +429,7 @@ func runJoin(args []string) error {
 	primaryPath := fs.String("primary", "", "primary JPEG")
 	gainmapPath := fs.String("gainmap", "", "gainmap JPEG")
 	outPath := fs.String("out", "", "output UltraHDR JPEG")
+	boost := fs.Float64("boost", 0, "max content boost (e.g. 4) for a plain gainmap JPEG without metadata")
 	fs.SetOutput(os.Stderr)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -442,6 +444,13 @@ func runJoin(args []string) error {
 	gainmap, err := os.ReadFile(*gainmapPath)
 	if err != nil {
 		return err
+	}
+	if *boost > 0 {
+		container, err := ultrahdr.JoinWithBoost(primary, gainmap, float32(*boost))
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(*outPath, container, 0o644)
 	}
 	if *metaPath != "" {
 		metaData, err := os.ReadFile(*metaPath)
